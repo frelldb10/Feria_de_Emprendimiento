@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Ban, CircleCheckBig, ScanQrCode } from 'lucide-react';
+import { Ban, CircleCheckBig, ScanQrCode, WifiOff } from 'lucide-react';
 import type { ScanResult } from '../../store/actions';
 import { formatTime } from '../../lib/format';
 import { cn } from '../../lib/cn';
@@ -43,7 +43,7 @@ export function ScanResultScreen({ result, labels, onClose }: ScanResultScreenPr
 
   let title: string;
   let body: ReactNode;
-  const Icon = ok ? CircleCheckBig : result.status === 'duplicate' ? Ban : ScanQrCode;
+  const Icon = ok ? CircleCheckBig : result.status === 'duplicate' ? Ban : result.status === 'unknown' ? ScanQrCode : WifiOff;
 
   if (result.status === 'ok') {
     title = labels.ok;
@@ -71,7 +71,7 @@ export function ScanResultScreen({ result, labels, onClose }: ScanResultScreenPr
         <p className="mt-4 text-base">{labels.duplicateHint}</p>
       </>
     );
-  } else {
+  } else if (result.status === 'unknown') {
     title = 'Código no reconocido';
     body = (
       <>
@@ -81,6 +81,9 @@ export function ScanResultScreen({ result, labels, onClose }: ScanResultScreenPr
         </p>
       </>
     );
+  } else {
+    title = 'No se pudo registrar';
+    body = <p className="mx-auto max-w-sm text-lg">{result.message}</p>;
   }
 
   return createPortal(

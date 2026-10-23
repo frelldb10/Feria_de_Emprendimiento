@@ -3,7 +3,10 @@ import { Printer, QrCode, Search } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { StatusAlert } from '../../components/ui/StatusAlert';
 import { cn } from '../../lib/cn';
+import { describeError } from '../../lib/supabase';
+import { useCanEdit } from '../auth/useCanEdit';
 import { generateMissingQrCodes, setEntrepreneurSection } from '../../store/actions';
 import { useFairState } from '../../store/fairStore';
 import { SECTIONS } from '../../store/sections';
@@ -12,6 +15,7 @@ import { EVENT_DAYS, type Entrepreneur, type SectionId } from '../../store/types
 import { QrSheetModal } from './QrSheetModal';
 
 export function EntrepreneursTable() {
+  const canEdit = useCanEdit();
   const { entrepreneurs, attendance } = useFairState();
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState<{ title: string; list: Entrepreneur[] } | null>(null);
@@ -22,10 +26,29 @@ export function EntrepreneursTable() {
     [entrepreneurs, query],
   );
   const pendingQr = entrepreneurs.filter((e) => !e.qrCode).length;
+  const [generating, setGenerating] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
-  function generate() {
-    const generated = generateMissingQrCodes();
-    if (generated.length > 0) setSheet({ title: `Se generaron ${generated.length} códigos QR`, list: generated });
+  async function generate() {
+    setGenerating(true);
+    setFailure(null);
+    try {
+      const generated = await generateMissingQrCodes();
+      if (generated.length > 0) setSheet({ title: `Se generaron ${generated.length} códigos QR`, list: generated });
+    } catch (error) {
+      setFailure(describeError(error));
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function changeSection(entrepreneurId: string, section: SectionId | null) {
+    setFailure(null);
+    try {
+      await setEntrepreneurSection(entrepreneurId, section);
+    } catch (error) {
+      setFailure(describeError(error));
+    }
   }
 
   return (
@@ -43,12 +66,21 @@ export function EntrepreneursTable() {
           >
             Hoja de QR
           </Button>
-          <Button icon={QrCode} onClick={generate} disabled={pendingQr === 0}>
-            Generación masiva de QR{pendingQr > 0 ? ` (${pendingQr})` : ''}
-          </Button>
+          {canEdit && (
+            <Button icon={QrCode} onClick={() => void generate()} disabled={pendingQr === 0 || generating}>
+              {generating ? 'Generando…' : `Generación masiva de QR${pendingQr > 0 ? ` (${pendingQr})` : ''}`}
+            </Button>
+          )}
         </>
       }
     >
+      {failure && (
+        <div className="border-b border-carbon-100 px-4 py-3 sm:px-5">
+          <StatusAlert tone="danger" title="No se guardó el cambio">
+            {failure}
+          </StatusAlert>
+        </div>
+      )}
       <div className="border-b border-carbon-100 px-4 py-3 sm:px-5">
         <div className="relative max-w-sm">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-carbon-400" aria-hidden />
@@ -88,11 +120,12 @@ export function EntrepreneursTable() {
                   <td className="px-3 py-2.5">{e.businessName}</td>
                   <td className="px-3 py-1.5">
                     <select
+                      disabled={!canEdit}
                       value={e.section ?? ''}
-                      onChange={(event) => setEntrepreneurSection(e.id, (event.target.value || null) as SectionId | null)}
+                      onChange={(event) => void changeSection(e.id, (event.target.value || null) as SectionId | null)}
                       aria-label={`Sección de ${e.businessName}`}
                       className={cn(
-                        'h-9 w-full max-w-52 rounded-md border bg-white px-2 text-sm focus:border-verde-700 focus:outline-none',
+                        'h-9 w-full max-w-52 rounded-md border bg-white px-2 text-sm focus:border-verde-700 focus:outline-none disabled:bg-carbon-50 disabled:text-carbon-600',
                         e.section ? 'border-carbon-200' : 'border-amarillo-500 text-amarillo-900',
                       )}
                     >

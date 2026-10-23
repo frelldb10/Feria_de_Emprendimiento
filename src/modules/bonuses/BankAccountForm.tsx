@@ -22,12 +22,14 @@ interface BankAccountFormProps {
   entrepreneur: Entrepreneur;
   current?: BankAccount;
   submitLabel: string;
-  onSubmit: (account: BankAccount) => void;
+  onSubmit: (account: BankAccount) => void | Promise<void>;
   onCancel?: () => void;
+  /** Mientras se guarda en el servidor. */
+  busy?: boolean;
 }
 
 
-export function BankAccountForm({ entrepreneur, current, submitLabel, onSubmit, onCancel }: BankAccountFormProps) {
+export function BankAccountForm({ entrepreneur, current, submitLabel, onSubmit, onCancel, busy = false }: BankAccountFormProps) {
   const [form, setForm] = useState<AccountForm>(() => emptyAccountForm(entrepreneur, current));
   const [errors, setErrors] = useState<AccountErrors>({});
   const wallet = isWallet(form.bank);
@@ -52,7 +54,7 @@ export function BankAccountForm({ entrepreneur, current, submitLabel, onSubmit, 
     event.preventDefault();
     const { errors: found, account } = validateAccount(form);
     setErrors(found);
-    if (account) onSubmit(account);
+    if (account && !busy) void onSubmit(account);
   }
 
   const types: AccountType[] = wallet ? ['billetera'] : ['ahorros', 'corriente'];
@@ -180,8 +182,8 @@ export function BankAccountForm({ entrepreneur, current, submitLabel, onSubmit, 
             Cancelar
           </Button>
         )}
-        <Button type="submit" size="lg" icon={Landmark} fullWidth={!onCancel}>
-          {submitLabel}
+        <Button type="submit" size="lg" icon={Landmark} fullWidth={!onCancel} disabled={busy}>
+          {busy ? 'Guardando…' : submitLabel}
         </Button>
       </div>
     </form>

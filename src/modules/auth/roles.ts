@@ -1,6 +1,6 @@
-import { ChartColumn, DoorOpen, GraduationCap, Landmark, LayoutDashboard, Truck, type LucideIcon } from 'lucide-react';
+import { ChartColumn, DoorOpen, Eye, GraduationCap, Landmark, LayoutDashboard, Truck, type LucideIcon } from 'lucide-react';
 
-export type Role = 'admin' | 'door' | 'logistics' | 'bonuses' | 'training' | 'finance';
+export type Role = 'admin' | 'observer' | 'door' | 'logistics' | 'bonuses' | 'training' | 'finance';
 
 export interface RoleInfo {
   label: string;
@@ -15,6 +15,12 @@ export const ROLES: Record<Role, RoleInfo> = {
     home: '/admin',
     description: 'Métricas, carga de emprendedores, códigos QR y reportes.',
     icon: LayoutDashboard,
+  },
+  observer: {
+    label: 'Observador',
+    home: '/admin',
+    description: 'Ve el panel, todos los módulos y los reportes, sin hacer cambios.',
+    icon: Eye,
   },
   door: {
     label: 'Operador de Puerta',
@@ -48,7 +54,10 @@ export const ROLES: Record<Role, RoleInfo> = {
   },
 };
 
-export const ROLE_ORDER: Role[] = ['admin', 'door', 'training', 'logistics', 'bonuses', 'finance'];
+export const ROLE_ORDER: Role[] = ['admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance'];
+
+/** Roles con el menú completo del administrador (el observador lo ve todo, pero sin editar). */
+export const OVERSEER_ROLES: Role[] = ['admin', 'observer'];
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && value in ROLES;

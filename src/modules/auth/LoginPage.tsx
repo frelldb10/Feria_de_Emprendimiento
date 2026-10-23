@@ -7,33 +7,40 @@ import { Button } from '../../components/ui/Button';
 import { TextField } from '../../components/ui/Field';
 import { PasswordField } from '../../components/ui/PasswordField';
 import { StatusAlert } from '../../components/ui/StatusAlert';
+import { LoadingScreen } from '../../components/layout/LoadingScreen';
+import { SUPABASE_CONFIGURED } from '../../lib/supabase';
 import { useAuth } from './AuthContext';
 import { ROLES } from './roles';
-import { cleanUsername, INITIAL_ADMIN_CONFIGURED, useUsers } from './userStore';
+import { cleanUsername } from './users';
 
 export function LoginPage() {
-  const { user, login } = useAuth();
+  const { status, user, notice, login } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const noAccounts = useUsers().length === 0 && !INITIAL_ADMIN_CONFIGURED;
+  const [busy, setBusy] = useState(false);
 
+  if (status === 'loading') return <LoadingScreen />;
   if (user) return <Navigate to={ROLES[user.role].home} replace />;
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!username || !password) {
       setError('Escribe tu usuario y tu contraseña.');
       return;
     }
-    const result = login(username, password);
+    setBusy(true);
+    const result = await login(username, password);
+    setBusy(false);
     if (result.ok) navigate(ROLES[result.user.role].home, { replace: true });
     else {
       setError(result.message);
       setPassword('');
     }
   }
+
+  const shownError = error ?? notice;
 
   return (
     <div className="min-h-dvh bg-white lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
@@ -65,13 +72,13 @@ export function LoginPage() {
               <p className="mt-1 text-sm text-carbon-500">Usa el usuario y la contraseña que te dio el administrador.</p>
             </div>
 
-            {noAccounts && (
-              <StatusAlert tone="warning" title="Falta configurar el primer administrador">
-                Copia el archivo .env.example con el nombre .env.local, escribe ahí el usuario y la contraseña del
-                administrador y vuelve a iniciar la aplicación.
+            {!SUPABASE_CONFIGURED && (
+              <StatusAlert tone="warning" title="Falta la conexión con el servidor">
+                Copia el archivo .env.example con el nombre .env.local, escribe ahí la dirección y la clave pública del
+                proyecto de Supabase y vuelve a iniciar la aplicación.
               </StatusAlert>
             )}
-            {error && <StatusAlert tone="danger" title={error} />}
+            {shownError && <StatusAlert tone="danger" title={shownError} />}
 
             <TextField
               label="Usuario"
@@ -97,8 +104,8 @@ export function LoginPage() {
               autoComplete="current-password"
             />
 
-            <Button type="submit" size="lg" fullWidth icon={LogIn}>
-              Entrar
+            <Button type="submit" size="lg" fullWidth icon={LogIn} disabled={busy || !SUPABASE_CONFIGURED}>
+              {busy ? 'Entrando…' : 'Entrar'}
             </Button>
 
             <p className="text-sm text-carbon-500">

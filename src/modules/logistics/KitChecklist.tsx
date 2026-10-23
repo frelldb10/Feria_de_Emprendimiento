@@ -1,15 +1,15 @@
 import { useState, type FormEvent } from 'react';
-import { PackageCheck } from 'lucide-react';
+import { Image, PackageCheck } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { PhotoCapture } from '../../components/ui/PhotoCapture';
 import { StatusAlert } from '../../components/ui/StatusAlert';
 import { formatTime } from '../../lib/format';
-import { buildPhotoRef } from '../../lib/photo';
-import { registerKitDelivery } from '../../store/actions';
+import { describeError } from '../../lib/supabase';
+import { getEvidenceUrl, registerKitDelivery } from '../../store/actions';
 import { isKitComplete } from '../../store/selectors';
 import type { Entrepreneur, KitDelivery, KitItemId } from '../../store/types';
-import { useAuth } from '../auth/AuthContext';
+import { useCanEdit } from '../auth/useCanEdit';
 import { EMPTY_KIT, KIT_ITEMS } from './kit';
 
 interface KitChecklistProps {
@@ -17,13 +17,46 @@ interface KitChecklistProps {
   delivery?: KitDelivery;
 }
 
+/** Abre la foto de evidencia con un enlace temporal (el almacenamiento es privado). */
+function EvidenceButton({ path }: { path: string }) {
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+
+  async function open() {
+    // La ventana se abre antes de esperar al servidor para que el navegador no la bloquee.
+    const tab = window.open('', '_blank');
+    setState('loading');
+    try {
+      const url = await getEvidenceUrl(path);
+      if (tab) tab.location.href = url;
+      else window.location.assign(url);
+      setState('idle');
+    } catch {
+      tab?.close();
+      setState('error');
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void open()}
+      className="mt-1 inline-flex items-center gap-1.5 font-semibold underline underline-offset-2"
+    >
+      <Image className="size-4" aria-hidden />
+      {state === 'loading' ? 'Abriendo…' : state === 'error' ? 'No se pudo abrir; reintentar' : 'Ver foto'}
+    </button>
+  );
+}
+
 /** Montar con key={entrepreneur.id} para que el formulario se limpie al cambiar de emprendedor. */
 export function KitChecklist({ entrepreneur, delivery }: KitChecklistProps) {
-  const { operator } = useAuth();
+  const canEdit = useCanEdit();
   const [items, setItems] = useState<Record<KitItemId, boolean>>(delivery?.items ?? EMPTY_KIT);
   const [photo, setPhoto] = useState<File | null>(null);
   const [errors, setErrors] = useState<{ items?: string; photo?: string }>({});
   const [saved, setSaved] = useState<KitDelivery | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
   const anyChecked = Object.values(items).some(Boolean);
   const complete = isKitComplete(delivery);
@@ -34,7 +67,7 @@ export function KitChecklist({ entrepreneur, delivery }: KitChecklistProps) {
     setSaved(null);
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const nextErrors = {
       items: anyChecked ? undefined : 'Marca al menos un elemento entregado.',
@@ -43,13 +76,39 @@ export function KitChecklist({ entrepreneur, delivery }: KitChecklistProps) {
     setErrors(nextErrors);
     if (nextErrors.items || nextErrors.photo || !photo) return;
 
-    const reference = entrepreneur.qrCode ?? entrepreneur.document;
-    setSaved(registerKitDelivery(entrepreneur.id, items, buildPhotoRef('kit', reference, photo), operator));
-    setPhoto(null);
+    setBusy(true);
+    setFailure(null);
+    try {
+      setSaved(await registerKitDelivery(entrepreneur, items, photo));
+      setPhoto(null);
+    } catch (error) {
+      setFailure(describeError(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // El observador solo ve qué se entregó y la foto.
+  if (!canEdit) {
+    if (!delivery) return <p className="text-sm text-carbon-600">Todavía no se ha registrado la entrega del kit.</p>;
+    return (
+      <StatusAlert tone={complete ? 'success' : 'warning'} title={complete ? 'Kit entregado completo' : 'Entrega parcial'}>
+        {KIT_ITEMS.map((item) => `${item.label}: ${delivery.items[item.id] ? 'sí' : 'no'}`).join(' · ')}
+        <br />
+        Registrado a las {formatTime(delivery.at)} por {delivery.operator}.
+        <br />
+        <EvidenceButton path={delivery.photo.path} />
+      </StatusAlert>
+    );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      {failure && (
+        <StatusAlert tone="danger" title="No se registró la entrega">
+          {failure}
+        </StatusAlert>
+      )}
       {saved ? (
         <StatusAlert tone="success" title={isKitComplete(saved) ? 'Kit entregado completo' : 'Entrega parcial registrada'}>
           Foto guardada como <span className="font-mono text-xs break-all">{saved.photo.fileName}</span>
@@ -62,11 +121,13 @@ export function KitChecklist({ entrepreneur, delivery }: KitChecklistProps) {
           >
             Registrado a las {formatTime(delivery.at)} por {delivery.operator}.
             {!complete && ' Marca lo que se entrega ahora y toma una nueva foto.'}
+            <br />
+            <EvidenceButton path={delivery.photo.path} />
           </StatusAlert>
         )
       )}
 
-      <fieldset>
+      <fieldset disabled={busy}>
         <legend className="mb-2 text-sm font-semibold text-carbon-800">Elementos del kit</legend>
         <div className="space-y-2">
           {KIT_ITEMS.map((item) => (
@@ -88,8 +149,8 @@ export function KitChecklist({ entrepreneur, delivery }: KitChecklistProps) {
         required
       />
 
-      <Button type="submit" size="lg" icon={PackageCheck} fullWidth>
-        {delivery ? 'Actualizar entrega' : 'Registrar entrega'}
+      <Button type="submit" size="lg" icon={PackageCheck} fullWidth disabled={busy}>
+        {busy ? 'Subiendo la foto y guardando…' : delivery ? 'Actualizar entrega' : 'Registrar entrega'}
       </Button>
     </form>
   );

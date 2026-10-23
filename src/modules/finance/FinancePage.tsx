@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
 import { useFairState } from '../../store/fairStore';
+import { useCanEdit } from '../auth/useCanEdit';
 import { ReportDownloadButton } from '../reports/ReportDownloadButton';
 import { SalesBalance } from './SalesBalance';
 import { SalesCapture } from './SalesCapture';
@@ -9,6 +10,7 @@ import { SalesCapture } from './SalesCapture';
 type FinanceTab = 'capture' | 'balance';
 
 export function FinancePage() {
+  const canEdit = useCanEdit();
   const { sales } = useFairState();
   const [tab, setTab] = useState<FinanceTab>('capture');
 
@@ -24,18 +26,21 @@ export function FinancePage() {
         }
       />
 
-      <Tabs
-        label="Vista"
-        size="lg"
-        value={tab}
-        onChange={setTab}
-        items={[
-          { id: 'capture', label: 'Registrar ventas' },
-          { id: 'balance', label: 'Balance' },
-        ]}
-      />
+      {/* El observador solo ve el balance. */}
+      {canEdit && (
+        <Tabs
+          label="Vista"
+          size="lg"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'capture', label: 'Registrar ventas' },
+            { id: 'balance', label: 'Balance' },
+          ]}
+        />
+      )}
 
-      {tab === 'capture' ? <SalesCapture /> : <SalesBalance />}
+      {canEdit && tab === 'capture' ? <SalesCapture /> : <SalesBalance />}
     </div>
   );
 }

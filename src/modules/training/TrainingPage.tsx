@@ -4,21 +4,22 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { RecentScans } from '../../components/scan/RecentScans';
 import { ScannerPanel } from '../../components/scan/ScannerPanel';
 import { ScanResultScreen } from '../../components/scan/ScanResultScreen';
+import { useScanner } from '../../components/scan/useScanner';
 import { EntrepreneurSearch } from '../../components/shared/EntrepreneurSearch';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { formatDateOnly, formatTime } from '../../lib/format';
-import { registerTraining, registerTrainingByCode, type ScanResult } from '../../store/actions';
+import { registerTraining, registerTrainingByCode } from '../../store/actions';
 import { useFairState } from '../../store/fairStore';
 import { indexEntrepreneurs } from '../../store/selectors';
 import type { Entrepreneur } from '../../store/types';
-import { useAuth } from '../auth/AuthContext';
+import { useCanEdit } from '../auth/useCanEdit';
 import { ReportDownloadButton } from '../reports/ReportDownloadButton';
 
 export function TrainingPage() {
-  const { operator } = useAuth();
+  const canEdit = useCanEdit();
   const { entrepreneurs, training } = useFairState();
-  const [result, setResult] = useState<ScanResult | null>(null);
+  const { result, busy, run, clear } = useScanner();
   const [lastCode, setLastCode] = useState<string | null>(null);
 
   const attended = useMemo(() => new Map(training.attendance.map((a) => [a.entrepreneurId, a])), [training.attendance]);
@@ -33,7 +34,7 @@ export function TrainingPage() {
   function handleCode(code: string) {
     const normalized = code.trim().toUpperCase();
     setLastCode(normalized);
-    setResult(registerTrainingByCode(normalized, operator));
+    void run(() => registerTrainingByCode(normalized));
   }
 
   function simulateScan() {
@@ -44,7 +45,7 @@ export function TrainingPage() {
   }
 
   function handleManual(entrepreneur: Entrepreneur) {
-    setResult(registerTraining(entrepreneur.id, operator, 'manual'));
+    void run(() => registerTraining(entrepreneur.id, 'manual'));
   }
 
   return (
@@ -68,41 +69,49 @@ export function TrainingPage() {
         </p>
       </div>
 
-      <Card title="Escanear QR" description="El mismo código que el emprendedor usa para entrar a la feria.">
-        {withQr.length === 0 ? (
-          <p className="text-sm text-carbon-600">
-            Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
-          </p>
-        ) : (
-          <ScannerPanel onCode={handleCode} onSimulate={simulateScan} lastCode={lastCode} />
-        )}
-      </Card>
+      {canEdit && (
+        <>
+          <Card title="Escanear QR" description="El mismo código que el emprendedor usa para entrar a la feria.">
+            {withQr.length === 0 ? (
+              <p className="text-sm text-carbon-600">
+                Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
+              </p>
+            ) : (
+              <ScannerPanel onCode={handleCode} onSimulate={simulateScan} lastCode={lastCode} busy={busy} />
+            )}
+          </Card>
 
-      <Card title="Búsqueda manual" description="Si el QR no lee o la persona no lo trae.">
-        <EntrepreneurSearch
-          entrepreneurs={entrepreneurs}
-          onSelect={handleManual}
-          label="Documento o nombre"
-          placeholder="Ej. 1065812345 o Yarledis"
-          actionLabel="Registrar"
-          renderMeta={(e) => {
-            const record = attended.get(e.id);
-            return record ? <Badge tone="success">Asistió {formatTime(record.at)}</Badge> : <Badge>Sin registro</Badge>;
-          }}
-        />
-      </Card>
+          <Card title="Búsqueda manual" description="Si el QR no lee o la persona no lo trae.">
+            <EntrepreneurSearch
+              entrepreneurs={entrepreneurs}
+              onSelect={handleManual}
+              label="Documento o nombre"
+              placeholder="Ej. 1065812345 o Yarledis"
+              actionLabel="Registrar"
+              renderMeta={(e) => {
+                const record = attended.get(e.id);
+                return record ? <Badge tone="success">Asistió {formatTime(record.at)}</Badge> : <Badge>Sin registro</Badge>;
+              }}
+            />
+          </Card>
+        </>
+      )}
 
       <Card
         title="Últimos registros"
         actions={<ReportDownloadButton report="capacitacion" disabled={training.attendance.length === 0}>Evidencia en Excel</ReportDownloadButton>}
       >
-        <RecentScans entries={recent} entrepreneurs={entrepreneurIndex} emptyTitle="Todavía no hay asistentes registrados" />
+        <RecentScans
+          entries={canEdit ? recent : [...training.attendance].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30)}
+          entrepreneurs={entrepreneurIndex}
+          emptyTitle="Todavía no hay asistentes registrados"
+        />
       </Card>
 
       {result && (
         <ScanResultScreen
           result={result}
-          onClose={() => setResult(null)}
+          onClose={clear}
           labels={{
             context: 'Capacitación',
             ok: 'Asistencia registrada',

@@ -1,9 +1,12 @@
-import { createId, randomToken } from '../lib/random';
-import { commit, getState, withActivity } from './fairStore';
-import { getBonusEligibility, type BonusEligibility } from './rules';
+import { compressImage } from '../lib/image';
+import { photoFileName } from '../lib/photo';
+import { ActionError, describeError, supabase } from '../lib/supabase';
+import { getState } from './fairStore';
+import { refresh, refreshQuietly, toBonus, toEntrepreneur, toKit } from './remote';
+import { DEMO_ENTREPRENEURS } from './seed';
 import { findByQrCode } from './selectors';
 import type {
-  AttendanceRecord,
+  ActivityKind,
   BankAccount,
   Entrepreneur,
   EntrepreneurshipBonus,
@@ -12,16 +15,35 @@ import type {
   KitItemId,
   LogisticsField,
   NewEntrepreneur,
-  PhotoRef,
   RegistrationMethod,
   SaleCut,
-  SaleRecord,
   SectionId,
-  TrainingAttendance,
   TrainingInfo,
 } from './types';
 
-const now = () => new Date().toISOString();
+/*
+  Todas las escrituras van al servidor. Quién registró y a qué hora lo pone la base de datos,
+  no el celular. Cada acción lanza ActionError con un mensaje listo para mostrar.
+*/
+
+async function run<T>(operation: () => PromiseLike<{ data: T; error: unknown }>): Promise<T> {
+  let result: { data: T; error: unknown };
+  try {
+    result = await operation();
+  } catch (error) {
+    throw new ActionError(describeError(error));
+  }
+  if (result.error) throw new ActionError(describeError(result.error));
+  return result.data;
+}
+
+/** El historial de actividad es informativo: si no se puede guardar, no se interrumpe nada. */
+function logActivity(kind: ActivityKind, message: string): void {
+  void supabase
+    .from('activity')
+    .insert({ kind, message })
+    .then(() => undefined, () => undefined);
+}
 
 /* ---------- Lectura de QR (puerta y capacitación) ---------- */
 
@@ -29,234 +51,267 @@ const now = () => new Date().toISOString();
 export type ScanResult =
   | { status: 'ok'; entrepreneur: Entrepreneur; at: string }
   | { status: 'duplicate'; entrepreneur: Entrepreneur; previousAt: string; previousOperator: string }
-  | { status: 'unknown'; code: string };
+  | { status: 'unknown'; code: string }
+  | { status: 'error'; message: string };
 
-function resolveCode(code: string): Entrepreneur | ScanResult {
-  const state = getState();
-  const entrepreneur = findByQrCode(state, code);
-  if (entrepreneur) return entrepreneur;
-  commit(withActivity(state, 'unknown-code', `Código no reconocido: ${code.trim()}`));
-  return { status: 'unknown', code: code.trim() };
+type RegisterReply = { status: 'ok' | 'duplicate'; at: string; operator?: string };
+
+/** Busca el código en la copia local y, si no está (pudo generarse hace un momento), en el servidor. */
+async function resolveCode(code: string): Promise<Entrepreneur | null> {
+  const cached = findByQrCode(getState(), code);
+  if (cached) return cached;
+  const row = await run(() => supabase.from('entrepreneurs').select('*').eq('qr_code', code.trim().toUpperCase()).maybeSingle());
+  if (row) refreshQuietly('entrepreneurs');
+  return row ? toEntrepreneur(row) : null;
 }
 
-const isResult = (value: Entrepreneur | ScanResult): value is ScanResult => 'status' in value;
+async function scan(
+  entrepreneurId: string,
+  register: () => PromiseLike<{ data: unknown; error: unknown }>,
+  messages: { ok: (name: string) => string; duplicate: (name: string) => string },
+  slice: 'attendance' | 'trainingAttendance',
+): Promise<ScanResult> {
+  const entrepreneur = getState().entrepreneurs.find((e) => e.id === entrepreneurId);
+  if (!entrepreneur) return { status: 'unknown', code: entrepreneurId };
+  try {
+    const reply = (await run(register)) as RegisterReply;
+    if (reply.status === 'ok') {
+      logActivity(slice === 'attendance' ? 'attendance' : 'training', messages.ok(entrepreneur.businessName));
+      refreshQuietly(slice);
+      return { status: 'ok', entrepreneur, at: reply.at };
+    }
+    logActivity('duplicate', messages.duplicate(entrepreneur.businessName));
+    return { status: 'duplicate', entrepreneur, previousAt: reply.at, previousOperator: reply.operator ?? '' };
+  } catch (error) {
+    return { status: 'error', message: describeError(error) };
+  }
+}
+
+async function scanByCode(code: string, registerFor: (id: string) => Promise<ScanResult>): Promise<ScanResult> {
+  const clean = code.trim().toUpperCase();
+  try {
+    const entrepreneur = await resolveCode(clean);
+    if (!entrepreneur) {
+      logActivity('unknown-code', `Código no reconocido: ${clean}`);
+      return { status: 'unknown', code: clean };
+    }
+    return registerFor(entrepreneur.id);
+  } catch (error) {
+    return { status: 'error', message: describeError(error) };
+  }
+}
 
 /* ---------- Puerta ---------- */
 
-export function registerAttendance(
-  entrepreneurId: string,
-  day: EventDay,
-  operator: string,
-  method: RegistrationMethod,
-): ScanResult {
-  const state = getState();
-  const entrepreneur = state.entrepreneurs.find((e) => e.id === entrepreneurId);
-  if (!entrepreneur) return { status: 'unknown', code: entrepreneurId };
-
-  const previous = state.attendance.find((a) => a.entrepreneurId === entrepreneurId && a.day === day);
-  if (previous) {
-    commit(withActivity(state, 'duplicate', `Ingreso repetido bloqueado: ${entrepreneur.businessName} (Día ${day})`));
-    return { status: 'duplicate', entrepreneur, previousAt: previous.at, previousOperator: previous.operator };
-  }
-
-  const record: AttendanceRecord = { id: createId('asi'), entrepreneurId, day, at: now(), operator, method };
-  commit(
-    withActivity(
-      { ...state, attendance: [...state.attendance, record] },
-      'attendance',
-      `${entrepreneur.businessName} ingresó el Día ${day}`,
-    ),
+export function registerAttendance(entrepreneurId: string, day: EventDay, method: RegistrationMethod): Promise<ScanResult> {
+  return scan(
+    entrepreneurId,
+    () => supabase.rpc('register_attendance', { p_entrepreneur_id: entrepreneurId, p_day: day, p_method: method }),
+    {
+      ok: (name) => `${name} ingresó el Día ${day}`,
+      duplicate: (name) => `Ingreso repetido bloqueado: ${name} (Día ${day})`,
+    },
+    'attendance',
   );
-  return { status: 'ok', entrepreneur, at: record.at };
 }
 
-export function registerAttendanceByCode(code: string, day: EventDay, operator: string): ScanResult {
-  const resolved = resolveCode(code);
-  return isResult(resolved) ? resolved : registerAttendance(resolved.id, day, operator, 'qr');
+export function registerAttendanceByCode(code: string, day: EventDay): Promise<ScanResult> {
+  return scanByCode(code, (id) => registerAttendance(id, day, 'qr'));
 }
 
 /* ---------- Capacitación ---------- */
 
-export function registerTraining(entrepreneurId: string, operator: string, method: RegistrationMethod): ScanResult {
-  const state = getState();
-  const entrepreneur = state.entrepreneurs.find((e) => e.id === entrepreneurId);
-  if (!entrepreneur) return { status: 'unknown', code: entrepreneurId };
-
-  const previous = state.training.attendance.find((a) => a.entrepreneurId === entrepreneurId);
-  if (previous) {
-    commit(withActivity(state, 'duplicate', `Asistencia repetida a capacitación: ${entrepreneur.businessName}`));
-    return { status: 'duplicate', entrepreneur, previousAt: previous.at, previousOperator: previous.operator };
-  }
-
-  const record: TrainingAttendance = { id: createId('cap'), entrepreneurId, at: now(), operator, method };
-  commit(
-    withActivity(
-      { ...state, training: { ...state.training, attendance: [...state.training.attendance, record] } },
-      'training',
-      `${entrepreneur.businessName} asistió a la capacitación`,
-    ),
+export function registerTraining(entrepreneurId: string, method: RegistrationMethod): Promise<ScanResult> {
+  return scan(
+    entrepreneurId,
+    () => supabase.rpc('register_training', { p_entrepreneur_id: entrepreneurId, p_method: method }),
+    {
+      ok: (name) => `${name} asistió a la capacitación`,
+      duplicate: (name) => `Asistencia repetida a capacitación: ${name}`,
+    },
+    'trainingAttendance',
   );
-  return { status: 'ok', entrepreneur, at: record.at };
 }
 
-export function registerTrainingByCode(code: string, operator: string): ScanResult {
-  const resolved = resolveCode(code);
-  return isResult(resolved) ? resolved : registerTraining(resolved.id, operator, 'qr');
+export function registerTrainingByCode(code: string): Promise<ScanResult> {
+  return scanByCode(code, (id) => registerTraining(id, 'qr'));
 }
 
-export function updateTrainingInfo(info: TrainingInfo): void {
-  const state = getState();
-  commit({ ...state, training: { ...state.training, info } });
+export async function updateTrainingInfo(info: TrainingInfo): Promise<void> {
+  await run(() =>
+    supabase
+      .from('training_info')
+      .update({ title: info.title, date: info.date || null, place: info.place })
+      .eq('id', 1),
+  );
+  await refresh('trainingInfo');
 }
 
 /* ---------- Logística ---------- */
 
-export function setLogisticsCheck(entrepreneurId: string, field: LogisticsField, value: boolean, operator: string): void {
-  const state = getState();
-  const current = state.logistics[entrepreneurId] ?? {
-    standReady: false,
-    powerConnected: false,
-    chairsDelivered: false,
-  };
-  commit({
-    ...state,
-    logistics: {
-      ...state.logistics,
-      [entrepreneurId]: { ...current, [field]: value, updatedAt: now(), operator },
-    },
-  });
+const LOGISTICS_COLUMN: Record<LogisticsField, string> = {
+  standReady: 'stand_ready',
+  powerConnected: 'power_connected',
+  chairsDelivered: 'chairs_delivered',
+};
+
+export async function setLogisticsCheck(entrepreneurId: string, field: LogisticsField, value: boolean): Promise<void> {
+  await run(() =>
+    supabase
+      .from('logistics_checks')
+      .upsert({ entrepreneur_id: entrepreneurId, [LOGISTICS_COLUMN[field]]: value }, { onConflict: 'entrepreneur_id' }),
+  );
+  await refresh('logistics');
 }
 
-/** Registra la entrega del kit. Si ya había una (por ejemplo parcial), la reemplaza. */
-export function registerKitDelivery(
-  entrepreneurId: string,
+/** Sube la foto (achicada) y registra la entrega. Si ya había una (por ejemplo parcial), la reemplaza. */
+export async function registerKitDelivery(
+  entrepreneur: Entrepreneur,
   items: Record<KitItemId, boolean>,
-  photo: PhotoRef,
-  operator: string,
-): KitDelivery {
-  const state = getState();
-  const entrepreneur = state.entrepreneurs.find((e) => e.id === entrepreneurId);
-  const delivery: KitDelivery = { id: createId('kit'), entrepreneurId, items, photo, at: now(), operator };
-  const complete = Object.values(items).every(Boolean);
-  commit(
-    withActivity(
-      { ...state, kits: [...state.kits.filter((k) => k.entrepreneurId !== entrepreneurId), delivery] },
-      'kit',
-      `Kit ${complete ? 'entregado' : 'entregado parcialmente'} a ${entrepreneur?.businessName ?? 'emprendedor'}`,
-    ),
+  photo: File,
+): Promise<KitDelivery> {
+  const image = await compressImage(photo);
+  const fileName = photoFileName('kit', entrepreneur.qrCode ?? entrepreneur.document);
+  const path = `kits/${fileName}`;
+  await run(() => supabase.storage.from('evidencias').upload(path, image, { contentType: 'image/jpeg', upsert: false }));
+
+  const row = await run(() =>
+    supabase
+      .from('kit_deliveries')
+      .upsert(
+        {
+          entrepreneur_id: entrepreneur.id,
+          gorras: items.gorras,
+          sueteres: items.sueteres,
+          pendon: items.pendon,
+          photo_path: path,
+          photo_name: fileName,
+          photo_size_kb: Math.round(image.size / 1024),
+        },
+        { onConflict: 'entrepreneur_id' },
+      )
+      .select()
+      .single(),
   );
-  return delivery;
+  const complete = Object.values(items).every(Boolean);
+  logActivity('kit', `Kit ${complete ? 'entregado' : 'entregado parcialmente'} a ${entrepreneur.businessName}`);
+  await refresh('kits');
+  return toKit(row);
+}
+
+/** Enlace temporal (10 minutos) para ver una foto de evidencia. */
+export async function getEvidenceUrl(path: string): Promise<string> {
+  const data = await run(() => supabase.storage.from('evidencias').createSignedUrl(path, 600));
+  if (!data) throw new ActionError('No se encontró la foto.');
+  return data.signedUrl;
 }
 
 /* ---------- Bono de emprendimiento ---------- */
 
-export type BonusResult = { ok: true; bonus: EntrepreneurshipBonus } | { ok: false; eligibility: BonusEligibility };
+const accountColumns = (account: BankAccount) => ({
+  bank: account.bank,
+  account_type: account.type,
+  account_number: account.number,
+  holder_name: account.holderName,
+  holder_document: account.holderDocument,
+});
 
-/** Vuelve a validar la asistencia aquí, no solo en la pantalla, antes de guardar. */
-export function registerBonus(entrepreneurId: string, account: BankAccount, operator: string): BonusResult {
-  const state = getState();
-  const eligibility = getBonusEligibility(state, entrepreneurId);
-  if (!eligibility.ok) return { ok: false, eligibility };
-
-  const entrepreneur = state.entrepreneurs.find((e) => e.id === entrepreneurId);
-  const bonus: EntrepreneurshipBonus = {
-    id: createId('bon'),
-    entrepreneurId,
-    account,
-    dataConsent: true,
-    verifiedDays: eligibility.attendance.map((a) => a.day),
-    at: now(),
-    operator,
-  };
-  commit(
-    withActivity(
-      { ...state, bonuses: [...state.bonuses, bonus] },
-      'bonus',
-      `Cuenta registrada para el bono de ${entrepreneur?.businessName ?? 'emprendedor'}`,
-    ),
-  );
-  return { ok: true, bonus };
+/** La base vuelve a comprobar la asistencia antes de guardar (no basta con la pantalla). */
+export async function registerBonus(entrepreneur: Entrepreneur, account: BankAccount): Promise<EntrepreneurshipBonus> {
+  const row = await run(() =>
+    supabase
+      .from('bonuses')
+      .insert({ entrepreneur_id: entrepreneur.id, ...accountColumns(account), data_consent: true })
+      .select()
+      .single(),
+  ).catch((error: ActionError) => {
+    throw error.message === 'Ese registro ya existe.' ? new ActionError('Este emprendedor ya tiene una cuenta registrada.') : error;
+  });
+  logActivity('bonus', `Cuenta registrada para el bono de ${entrepreneur.businessName}`);
+  await refresh('bonuses');
+  return toBonus(row);
 }
 
 /** Corrige los datos de una cuenta ya registrada (por ejemplo, un número mal dictado). */
-export function correctBonusAccount(bonusId: string, account: BankAccount, operator: string): EntrepreneurshipBonus | null {
-  const state = getState();
-  const current = state.bonuses.find((b) => b.id === bonusId);
-  if (!current) return null;
-  const updated: EntrepreneurshipBonus = { ...current, account, at: now(), operator };
-  const entrepreneur = state.entrepreneurs.find((e) => e.id === current.entrepreneurId);
-  commit(
-    withActivity(
-      { ...state, bonuses: state.bonuses.map((b) => (b.id === bonusId ? updated : b)) },
-      'bonus',
-      `Cuenta corregida para el bono de ${entrepreneur?.businessName ?? 'emprendedor'}`,
-    ),
-  );
-  return updated;
+export async function correctBonusAccount(
+  bonus: EntrepreneurshipBonus,
+  entrepreneur: Entrepreneur,
+  account: BankAccount,
+): Promise<EntrepreneurshipBonus> {
+  const row = await run(() => supabase.from('bonuses').update(accountColumns(account)).eq('id', bonus.id).select().single());
+  logActivity('bonus', `Cuenta corregida para el bono de ${entrepreneur.businessName}`);
+  await refresh('bonuses');
+  return toBonus(row);
 }
 
 /* ---------- Finanzas ---------- */
 
 /** Guarda (o reemplaza) lo vendido por un emprendedor en un corte del día. */
-export function recordSale(entrepreneurId: string, day: EventDay, cut: SaleCut, amount: number, operator: string): SaleRecord {
-  const state = getState();
-  const record: SaleRecord = { id: createId('ven'), entrepreneurId, day, cut, amount, at: now(), operator };
-  commit({
-    ...state,
-    sales: [
-      ...state.sales.filter((s) => !(s.entrepreneurId === entrepreneurId && s.day === day && s.cut === cut)),
-      record,
-    ],
-  });
-  return record;
+export async function recordSale(entrepreneurId: string, day: EventDay, cut: SaleCut, amount: number): Promise<void> {
+  await run(() =>
+    supabase
+      .from('sales')
+      .upsert({ entrepreneur_id: entrepreneurId, day, cut, amount }, { onConflict: 'entrepreneur_id,day,cut' }),
+  );
+  await refresh('sales');
 }
 
 /* ---------- Administración ---------- */
 
-export function importEntrepreneurs(rows: NewEntrepreneur[]): number {
+/** Carga solo los documentos nuevos; los que ya existen se ignoran. Devuelve cuántos entraron. */
+export async function importEntrepreneurs(rows: NewEntrepreneur[]): Promise<number> {
   if (rows.length === 0) return 0;
-  const state = getState();
-  const createdAt = now();
-  const added: Entrepreneur[] = rows.map((row) => ({ ...row, id: createId('emp'), qrCode: null, createdAt }));
-  commit(
-    withActivity(
-      { ...state, entrepreneurs: [...state.entrepreneurs, ...added] },
-      'import',
-      `Carga masiva: ${added.length} emprendedores nuevos`,
-    ),
+  const inserted = await run(() =>
+    supabase
+      .from('entrepreneurs')
+      .upsert(
+        rows.map((r) => ({
+          document: r.document,
+          owner_name: r.ownerName,
+          business_name: r.businessName,
+          phone: r.phone,
+          category: r.category,
+          section: r.section,
+          stand: r.stand,
+          needs_power: r.needsPower,
+          chairs: r.chairs,
+        })),
+        { onConflict: 'document', ignoreDuplicates: true },
+      )
+      .select('id'),
   );
-  return added.length;
+  const added = inserted?.length ?? 0;
+  if (added > 0) logActivity('import', `Carga masiva: ${added} emprendedores nuevos`);
+  await refresh('entrepreneurs');
+  return added;
 }
 
-export function setEntrepreneurSection(entrepreneurId: string, section: SectionId | null): void {
-  const state = getState();
-  commit({
-    ...state,
-    entrepreneurs: state.entrepreneurs.map((e) => (e.id === entrepreneurId ? { ...e, section } : e)),
-  });
+export async function setEntrepreneurSection(entrepreneurId: string, section: SectionId | null): Promise<void> {
+  await run(() => supabase.from('entrepreneurs').update({ section }).eq('id', entrepreneurId));
+  await refresh('entrepreneurs');
 }
 
 /**
- * Asigna un código a cada emprendedor que no lo tiene. Formato FE-0001-K7QM: el consecutivo
- * sirve para ubicarlo a ojo y el sufijo aleatorio evita que alguien adivine códigos válidos.
+ * Asigna un código a cada emprendedor que no lo tiene, en el servidor para que dos
+ * administradores no generen el mismo. Formato FE-0001-K7QM.
  */
-export function generateMissingQrCodes(): Entrepreneur[] {
-  const state = getState();
-  let sequence = state.entrepreneurs.reduce((max, e) => {
-    const n = e.qrCode ? Number.parseInt(e.qrCode.split('-')[1], 10) : 0;
-    return Number.isNaN(n) ? max : Math.max(max, n);
-  }, 0);
-
-  const generated: Entrepreneur[] = [];
-  const entrepreneurs = state.entrepreneurs.map((e) => {
-    if (e.qrCode) return e;
-    sequence += 1;
-    const updated = { ...e, qrCode: `FE-${String(sequence).padStart(4, '0')}-${randomToken(4)}` };
-    generated.push(updated);
-    return updated;
-  });
-  if (generated.length === 0) return [];
-
-  commit(withActivity({ ...state, entrepreneurs }, 'qr', `Se generaron ${generated.length} códigos QR`));
+export async function generateMissingQrCodes(): Promise<Entrepreneur[]> {
+  const rows = await run(() => supabase.rpc('generate_missing_qr_codes'));
+  const generated = (rows as Record<string, unknown>[]).map(toEntrepreneur);
+  if (generated.length > 0) logActivity('qr', `Se generaron ${generated.length} códigos QR`);
+  await refresh('entrepreneurs');
   return generated;
+}
+
+/** Los 24 emprendedores de prueba, con su QR. Útil para ensayar antes de cargar el Excel real. */
+export async function loadDemoEntrepreneurs(): Promise<number> {
+  const added = await importEntrepreneurs(DEMO_ENTREPRENEURS);
+  await generateMissingQrCodes();
+  return added;
+}
+
+/** Borra los datos de la feria (no las cuentas de usuario ni las fotos ya subidas). */
+export async function clearAllData(): Promise<void> {
+  await run(() => supabase.rpc('clear_fair_data'));
+  await refresh('entrepreneurs', 'attendance', 'trainingInfo', 'trainingAttendance', 'logistics', 'kits', 'bonuses', 'sales', 'activity');
 }

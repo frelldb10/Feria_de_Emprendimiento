@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { StatusAlert } from '../../components/ui/StatusAlert';
 import { plural } from '../../lib/format';
+import { describeError } from '../../lib/supabase';
 import { downloadWorkbook } from '../../lib/xlsx';
 import { importEntrepreneurs } from '../../store/actions';
 import { FileDropzone } from './FileDropzone';
@@ -41,11 +42,19 @@ export function BulkUpload({ existingDocuments }: { existingDocuments: Set<strin
     }
   }
 
-  function confirmImport() {
+  async function confirmImport() {
     if (!parsed) return;
     const rows = parsed.rows.filter((r) => r.errors.length === 0 && !r.duplicate).map((r) => r.data);
-    setImported(importEntrepreneurs(rows));
-    setParsed(null);
+    setBusy(true);
+    setError(null);
+    try {
+      setImported(await importEntrepreneurs(rows));
+      setParsed(null);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -70,7 +79,7 @@ export function BulkUpload({ existingDocuments }: { existingDocuments: Set<strin
           </StatusAlert>
         )}
         {parsed ? (
-          <ImportPreview parsed={parsed} onConfirm={confirmImport} onCancel={() => setParsed(null)} />
+          <ImportPreview parsed={parsed} onConfirm={() => void confirmImport()} onCancel={() => setParsed(null)} busy={busy} />
         ) : (
           <FileDropzone onFile={handleFile} busy={busy} />
         )}

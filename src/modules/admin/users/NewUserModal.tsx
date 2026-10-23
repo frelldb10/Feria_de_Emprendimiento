@@ -4,8 +4,10 @@ import { Button } from '../../../components/ui/Button';
 import { SelectField, TextField } from '../../../components/ui/Field';
 import { Modal } from '../../../components/ui/Modal';
 import { PasswordField } from '../../../components/ui/PasswordField';
+import { StatusAlert } from '../../../components/ui/StatusAlert';
+import { describeError } from '../../../lib/supabase';
 import { onlyLetters, suggestUsername } from '../../../lib/text';
-import { ROLE_ORDER, ROLES } from '../../auth/roles';
+import { ROLE_ORDER, ROLES, type Role } from '../../auth/roles';
 import {
   cleanUsername,
   createUser,
@@ -14,21 +16,31 @@ import {
   type AppUser,
   type NewUserErrors,
   type NewUserInput,
-} from '../../auth/userStore';
+} from '../../auth/users';
 import { CredentialsCard } from './CredentialsCard';
 
 const EMPTY: NewUserInput = { name: '', username: '', role: '', password: '' };
 
-export function NewUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+interface NewUserModalProps {
+  open: boolean;
+  onClose: () => void;
+  existing: AppUser[];
+}
+
+export function NewUserModal({ open, onClose, existing }: NewUserModalProps) {
   const [form, setForm] = useState<NewUserInput>(EMPTY);
   const [usernameTouched, setUsernameTouched] = useState(false);
   const [errors, setErrors] = useState<NewUserErrors>({});
-  const [created, setCreated] = useState<{ user: AppUser; password: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ name: string; username: string; role: Role; password: string } | null>(null);
 
   function close() {
+    if (busy) return;
     setForm(EMPTY);
     setUsernameTouched(false);
     setErrors({});
+    setFailure(null);
     setCreated(null);
     onClose();
   }
@@ -45,12 +57,22 @@ export function NewUserModal({ open, onClose }: { open: boolean; onClose: () => 
     setErrors((prev) => ({ ...prev, name: undefined, username: undefined }));
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const found = validateNewUser(form);
+    const found = validateNewUser(form, existing);
     setErrors(found);
     if (Object.keys(found).length > 0 || !form.role) return;
-    setCreated({ user: createUser({ ...form, role: form.role }), password: form.password });
+    const input = { name: form.name.trim(), username: form.username, role: form.role, password: form.password };
+    setBusy(true);
+    setFailure(null);
+    try {
+      await createUser(input);
+      setCreated(input);
+    } catch (error) {
+      setFailure(describeError(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -58,26 +80,31 @@ export function NewUserModal({ open, onClose }: { open: boolean; onClose: () => 
       open={open}
       onClose={close}
       title={created ? 'Usuario creado' : 'Nuevo usuario'}
-      description={created ? `${created.user.name} · ${ROLES[created.user.role].label}` : 'La persona entra con este usuario y contraseña.'}
+      description={created ? `${created.name} · ${ROLES[created.role].label}` : 'La persona entra con este usuario y contraseña.'}
       footer={
         created ? (
           <Button onClick={close}>Listo</Button>
         ) : (
           <>
-            <Button variant="secondary" onClick={close}>
+            <Button variant="secondary" onClick={close} disabled={busy}>
               Cancelar
             </Button>
-            <Button type="submit" form="new-user-form" icon={UserPlus}>
-              Crear usuario
+            <Button type="submit" form="new-user-form" icon={UserPlus} disabled={busy}>
+              {busy ? 'Creando…' : 'Crear usuario'}
             </Button>
           </>
         )
       }
     >
       {created ? (
-        <CredentialsCard name={created.user.name} username={created.user.username} password={created.password} />
+        <CredentialsCard name={created.name} username={created.username} password={created.password} />
       ) : (
         <form id="new-user-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {failure && (
+            <StatusAlert tone="danger" title="No se creó el usuario">
+              {failure}
+            </StatusAlert>
+          )}
           <TextField
             label="Nombre completo"
             value={form.name}

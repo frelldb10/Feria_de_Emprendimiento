@@ -1,20 +1,43 @@
+import { useEffect, useSyncExternalStore } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import {
   ChartColumn,
   DoorOpen,
+  Eye,
   FileSpreadsheet,
   GraduationCap,
   Landmark,
   LayoutDashboard,
+  RotateCcw,
   Truck,
   UserCog,
+  WifiOff,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../../modules/auth/AuthContext';
+import { OVERSEER_ROLES } from '../../modules/auth/roles';
 import { cn } from '../../lib/cn';
+import { resetFairState, setSyncStatus, useSyncStatus } from '../../store/fairStore';
+import { loadAll, subscribeToChanges } from '../../store/remote';
 import { BrandStripe } from '../brand/BrandStripe';
 import { AlcaldiaLogo, Escudo, FeriaLogo } from '../brand/Logos';
+import { Button } from '../ui/Button';
+import { StatusAlert } from '../ui/StatusAlert';
 import { AccountMenu } from './AccountMenu';
+import { LoadingScreen } from './LoadingScreen';
+
+function subscribeOnline(callback: () => void) {
+  window.addEventListener('online', callback);
+  window.addEventListener('offline', callback);
+  return () => {
+    window.removeEventListener('online', callback);
+    window.removeEventListener('offline', callback);
+  };
+}
+
+function useOnline(): boolean {
+  return useSyncExternalStore(subscribeOnline, () => navigator.onLine);
+}
 
 interface NavItem {
   to: string;
@@ -36,7 +59,23 @@ const ADMIN_NAV: NavItem[] = [
 
 export function AppShell() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = !!user && OVERSEER_ROLES.includes(user.role);
+  const readOnly = user?.role === 'observer';
+  const sync = useSyncStatus();
+  const online = useOnline();
+
+  // Con la sesión abierta se traen los datos y se escuchan los cambios de los demás equipos.
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    void loadAll();
+    const unsubscribe = subscribeToChanges();
+    return () => {
+      unsubscribe();
+      resetFairState();
+      setSyncStatus({ phase: 'idle' });
+    };
+  }, [userId]);
 
   return (
     <div className="min-h-dvh lg:flex">
@@ -53,9 +92,34 @@ export function AppShell() {
           </div>
           <BrandStripe />
           {isAdmin && <AdminTabs />}
+          {readOnly && (
+            <p className="flex items-center gap-2 bg-amarillo-100 px-4 py-2 text-sm font-semibold text-amarillo-900 sm:px-6">
+              <Eye className="size-4 shrink-0" aria-hidden />
+              Modo observador: puedes ver todo, pero no hacer cambios.
+            </p>
+          )}
+          {!online && (
+            <p role="alert" className="flex items-center gap-2 bg-rojo-600 px-4 py-2 text-sm font-semibold text-white sm:px-6">
+              <WifiOff className="size-4 shrink-0" aria-hidden />
+              Sin internet: no se puede registrar nada hasta que vuelva la conexión.
+            </p>
+          )}
         </header>
         <main className="flex-1">
-          <Outlet />
+          {sync.phase === 'ready' ? (
+            <Outlet />
+          ) : sync.phase === 'error' ? (
+            <div className="mx-auto max-w-md px-4 py-16">
+              <StatusAlert tone="danger" title="No se pudieron cargar los datos">
+                {sync.message}
+              </StatusAlert>
+              <Button className="mt-4" icon={RotateCcw} onClick={() => void loadAll()}>
+                Intentar de nuevo
+              </Button>
+            </div>
+          ) : (
+            <LoadingScreen message="Cargando los datos de la feria…" fullScreen={false} />
+          )}
         </main>
       </div>
     </div>

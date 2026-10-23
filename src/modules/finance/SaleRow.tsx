@@ -2,28 +2,39 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/Button';
 import { cn } from '../../lib/cn';
 import { formatThousands, formatTime } from '../../lib/format';
+import { describeError } from '../../lib/supabase';
 import type { Entrepreneur, SaleRecord } from '../../store/types';
 
 interface SaleRowProps {
   entrepreneur: Entrepreneur;
   record?: SaleRecord;
-  onSave: (amount: number) => void;
+  onSave: (amount: number) => Promise<void>;
 }
 
 /** Montar con una key que incluya día, corte e id del registro para que se reinicie al cambiar. */
 export function SaleRow({ entrepreneur, record, onSave }: SaleRowProps) {
   const [text, setText] = useState(record ? formatThousands(record.amount) : '');
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const digits = text.replace(/\D/g, '');
   const dirty = digits !== (record ? String(record.amount) : '');
 
   function handleChange(value: string) {
     const clean = value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 10);
     setText(clean ? formatThousands(Number(clean)) : '');
+    setFailure(null);
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (digits && dirty) onSave(Number(digits));
+    if (!digits || !dirty || saving) return;
+    setSaving(true);
+    try {
+      await onSave(Number(digits));
+    } catch (error) {
+      setFailure(describeError(error));
+      setSaving(false);
+    }
   }
 
   return (
@@ -37,8 +48,8 @@ export function SaleRow({ entrepreneur, record, onSave }: SaleRowProps) {
             <span className="mr-2 font-mono text-xs font-medium text-carbon-500">{entrepreneur.stand || '—'}</span>
             {entrepreneur.businessName}
           </p>
-          <p className={cn('truncate text-sm', record ? 'text-verde-700' : 'text-amarillo-700')}>
-            {record ? `Registrado ${formatTime(record.at)} · ${record.operator}` : 'Pendiente en este corte'}
+          <p className={cn('truncate text-sm', failure ? 'font-medium text-rojo-700' : record ? 'text-verde-700' : 'text-amarillo-700')}>
+            {failure ?? (record ? `Registrado ${formatTime(record.at)} · ${record.operator}` : 'Pendiente en este corte')}
           </p>
         </div>
         <div className="relative">
@@ -53,8 +64,14 @@ export function SaleRow({ entrepreneur, record, onSave }: SaleRowProps) {
             className="block h-12 w-full rounded-lg border border-carbon-300 bg-white pr-3 pl-7 text-right text-lg font-semibold tabular-nums placeholder:text-carbon-300 focus:border-verde-700 focus:ring-2 focus:ring-verde-700/20 focus:outline-none"
           />
         </div>
-        <Button type="submit" size="lg" variant={record && !dirty ? 'secondary' : 'primary'} disabled={!digits || !dirty} className="w-28">
-          {!record ? 'Guardar' : dirty ? 'Actualizar' : 'Guardado'}
+        <Button
+          type="submit"
+          size="lg"
+          variant={record && !dirty ? 'secondary' : 'primary'}
+          disabled={!digits || !dirty || saving}
+          className="w-28"
+        >
+          {saving ? 'Guardando' : !record ? 'Guardar' : dirty ? 'Actualizar' : 'Guardado'}
         </Button>
       </form>
     </li>

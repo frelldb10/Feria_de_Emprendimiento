@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Armchair, Plug, Store, type LucideIcon } from 'lucide-react';
-import { useAuth } from '../auth/AuthContext';
+import { StatusAlert } from '../../components/ui/StatusAlert';
 import { setLogisticsCheck } from '../../store/actions';
 import type { Entrepreneur, LogisticsCheck, LogisticsField } from '../../store/types';
 import { cn } from '../../lib/cn';
 import { formatTime } from '../../lib/format';
+import { describeError } from '../../lib/supabase';
+import { useCanEdit } from '../auth/useCanEdit';
 
 interface Requirement {
   field: LogisticsField;
@@ -15,7 +18,21 @@ interface Requirement {
 }
 
 export function RequirementsPanel({ entrepreneur, check }: { entrepreneur: Entrepreneur; check?: LogisticsCheck }) {
-  const { operator } = useAuth();
+  const canEdit = useCanEdit();
+  const [saving, setSaving] = useState<LogisticsField | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle(field: LogisticsField, value: boolean) {
+    setSaving(field);
+    setError(null);
+    try {
+      await setLogisticsCheck(entrepreneur.id, field, value);
+    } catch (failure) {
+      setError(describeError(failure));
+    } finally {
+      setSaving(null);
+    }
+  }
 
   const requirements: Requirement[] = [
     {
@@ -46,6 +63,7 @@ export function RequirementsPanel({ entrepreneur, check }: { entrepreneur: Entre
 
   return (
     <div>
+      {error && <StatusAlert tone="danger" title="No se guardó el cambio" className="mb-3">{error}</StatusAlert>}
       <ul className="space-y-2">
         {requirements.map(({ field, icon: Icon, title, value, doneLabel, applies }) => {
           const done = !!check?.[field];
@@ -67,10 +85,11 @@ export function RequirementsPanel({ entrepreneur, check }: { entrepreneur: Entre
                   <input
                     type="checkbox"
                     checked={done}
-                    onChange={(event) => setLogisticsCheck(entrepreneur.id, field, event.target.checked, operator)}
-                    className="size-6 cursor-pointer accent-verde-700"
+                    disabled={saving !== null || !canEdit}
+                    onChange={(event) => void toggle(field, event.target.checked)}
+                    className="size-6 cursor-pointer accent-verde-700 disabled:cursor-wait"
                   />
-                  {doneLabel}
+                  {saving === field ? 'Guardando…' : doneLabel}
                 </label>
               ) : (
                 <span className="px-2 text-sm text-carbon-400">No aplica</span>

@@ -9,9 +9,10 @@ interface ImportPreviewProps {
   parsed: ParseResult;
   onConfirm: () => void;
   onCancel: () => void;
+  busy?: boolean;
 }
 
-export function ImportPreview({ parsed, onConfirm, onCancel }: ImportPreviewProps) {
+export function ImportPreview({ parsed, onConfirm, onCancel, busy = false }: ImportPreviewProps) {
   const valid = parsed.rows.filter((r) => r.errors.length === 0 && !r.duplicate).length;
   const withErrors = parsed.rows.filter((r) => r.errors.length > 0).length;
   const duplicates = parsed.rows.filter((r) => r.errors.length === 0 && r.duplicate).length;
@@ -71,11 +72,11 @@ export function ImportPreview({ parsed, onConfirm, onCancel }: ImportPreviewProp
       </p>
 
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="secondary" icon={X} onClick={onCancel}>
+        <Button variant="secondary" icon={X} onClick={onCancel} disabled={busy}>
           Descartar
         </Button>
-        <Button icon={Upload} onClick={onConfirm} disabled={valid === 0}>
-          Cargar {plural(valid, 'emprendedor', 'emprendedores')}
+        <Button icon={Upload} onClick={onConfirm} disabled={valid === 0 || busy}>
+          {busy ? 'Cargando…' : `Cargar ${plural(valid, 'emprendedor', 'emprendedores')}`}
         </Button>
       </div>
     </div>

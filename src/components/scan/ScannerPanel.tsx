@@ -6,18 +6,20 @@ interface ScannerPanelProps {
   onCode: (code: string) => void;
   onSimulate: () => void;
   lastCode: string | null;
+  /** Mientras el servidor responde no se aceptan más lecturas. */
+  busy?: boolean;
 }
 
 /**
  * Cámara simulada. El campo de texto también sirve con lectores QR de mano (USB o Bluetooth),
  * que "escriben" el código y presionan Enter.
  */
-export function ScannerPanel({ onCode, onSimulate, lastCode }: ScannerPanelProps) {
+export function ScannerPanel({ onCode, onSimulate, lastCode, busy = false }: ScannerPanelProps) {
   const [code, setCode] = useState('');
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!code.trim()) return;
+    if (!code.trim() || busy) return;
     onCode(code);
     setCode('');
   }
@@ -38,15 +40,15 @@ export function ScannerPanel({ onCode, onSimulate, lastCode }: ScannerPanelProps
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2">
-        <Button size="lg" icon={ScanLine} onClick={onSimulate} fullWidth>
-          Simular lectura
+        <Button size="lg" icon={ScanLine} onClick={onSimulate} disabled={busy} fullWidth>
+          {busy ? 'Registrando…' : 'Simular lectura'}
         </Button>
         <Button
           size="lg"
           variant="secondary"
           icon={Repeat}
           onClick={() => lastCode && onCode(lastCode)}
-          disabled={!lastCode}
+          disabled={!lastCode || busy}
           fullWidth
         >
           Leer el último otra vez
@@ -70,7 +72,7 @@ export function ScannerPanel({ onCode, onSimulate, lastCode }: ScannerPanelProps
             className="block h-14 w-full rounded-lg border border-carbon-300 bg-white pr-3 pl-11 font-mono text-base uppercase placeholder:font-sans placeholder:normal-case placeholder:text-carbon-400 focus:border-verde-700 focus:ring-2 focus:ring-verde-700/20 focus:outline-none"
           />
         </div>
-        <Button type="submit" size="lg" variant="secondary" disabled={!code.trim()}>
+        <Button type="submit" size="lg" variant="secondary" disabled={!code.trim() || busy}>
           Validar
         </Button>
       </form>

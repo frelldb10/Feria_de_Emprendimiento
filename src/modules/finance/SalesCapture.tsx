@@ -10,13 +10,11 @@ import { recordSale } from '../../store/actions';
 import { useFairState } from '../../store/fairStore';
 import { SECTIONS } from '../../store/sections';
 import { SALE_CUTS, type EventDay, type SaleCut, type SectionId } from '../../store/types';
-import { useAuth } from '../auth/AuthContext';
 import { SaleRow } from './SaleRow';
 
 type SectionFilter = SectionId | 'all';
 
 export function SalesCapture() {
-  const { operator } = useAuth();
   const { entrepreneurs, sales } = useFairState();
   const [day, setDay] = useState<EventDay>(1);
   const [cut, setCut] = useState<SaleCut>(1);
@@ -103,7 +101,7 @@ export function SalesCapture() {
                   key={`${e.id}-${day}-${cut}-${record?.id ?? 'nuevo'}`}
                   entrepreneur={e}
                   record={record}
-                  onSave={(amount) => recordSale(e.id, day, cut, amount, operator)}
+                  onSave={(amount) => recordSale(e.id, day, cut, amount)}
                 />
               );
             })}

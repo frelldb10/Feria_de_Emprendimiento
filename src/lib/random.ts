@@ -8,7 +8,3 @@ export function randomToken(length: number): string {
   for (const byte of bytes) token += ALPHABET[byte % ALPHABET.length];
   return token;
 }
-
-export function createId(prefix: string): string {
-  return `${prefix}_${randomToken(10).toLowerCase()}`;
-}

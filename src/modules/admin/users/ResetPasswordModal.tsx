@@ -3,28 +3,42 @@ import { KeyRound } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { PasswordField } from '../../../components/ui/PasswordField';
-import { generatePassword, resetPassword, validatePassword, type AppUser } from '../../auth/userStore';
+import { StatusAlert } from '../../../components/ui/StatusAlert';
+import { describeError } from '../../../lib/supabase';
+import { generatePassword, resetPassword, validatePassword, type AppUser } from '../../auth/users';
 import { CredentialsCard } from './CredentialsCard';
 
 export function ResetPasswordModal({ user, onClose }: { user: AppUser | null; onClose: () => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   function close() {
+    if (busy) return;
     setPassword('');
     setError(undefined);
+    setFailure(null);
     setDone(false);
     onClose();
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const problem = validatePassword(password);
     setError(problem);
     if (problem || !user) return;
-    resetPassword(user.id, password);
-    setDone(true);
+    setBusy(true);
+    setFailure(null);
+    try {
+      await resetPassword(user.id, password);
+      setDone(true);
+    } catch (failed) {
+      setFailure(describeError(failed));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -38,11 +52,11 @@ export function ResetPasswordModal({ user, onClose }: { user: AppUser | null; on
           <Button onClick={close}>Listo</Button>
         ) : (
           <>
-            <Button variant="secondary" onClick={close}>
+            <Button variant="secondary" onClick={close} disabled={busy}>
               Cancelar
             </Button>
-            <Button type="submit" form="reset-password-form" icon={KeyRound}>
-              Guardar contraseña
+            <Button type="submit" form="reset-password-form" icon={KeyRound} disabled={busy}>
+              {busy ? 'Guardando…' : 'Guardar contraseña'}
             </Button>
           </>
         )
@@ -51,7 +65,12 @@ export function ResetPasswordModal({ user, onClose }: { user: AppUser | null; on
       {user && done ? (
         <CredentialsCard name={user.name} username={user.username} password={password} />
       ) : (
-        <form id="reset-password-form" onSubmit={handleSubmit} noValidate>
+        <form id="reset-password-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {failure && (
+            <StatusAlert tone="danger" title="No se cambió la contraseña">
+              {failure}
+            </StatusAlert>
+          )}
           <PasswordField
             label="Nueva contraseña"
             value={password}

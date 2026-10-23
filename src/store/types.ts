@@ -23,13 +23,12 @@ export interface Entrepreneur {
 
 export type NewEntrepreneur = Omit<Entrepreneur, 'id' | 'qrCode' | 'createdAt'>;
 
-/**
- * Referencia a la foto de evidencia. El archivo se nombra al tomarlo y ese nombre es
- * el que aparece en los reportes; subirlo a un almacenamiento depende del backend.
- */
+/** Foto de evidencia guardada en el almacenamiento "evidencias" de Supabase. */
 export interface PhotoRef {
+  /** Ruta dentro del almacenamiento, ej. kits/kit_FE-0003-K7QM_20261022-101530.jpg */
+  path: string;
+  /** Nombre del archivo; es el que aparece en los reportes. */
   fileName: string;
-  originalName: string;
   sizeKb: number;
 }
 
@@ -134,8 +133,8 @@ export interface ActivityEntry {
   message: string;
 }
 
+/** Copia en memoria de lo que el usuario puede ver en el servidor (según su rol). */
 export interface FairState {
-  version: 3;
   entrepreneurs: Entrepreneur[];
   attendance: AttendanceRecord[];
   training: { info: TrainingInfo; attendance: TrainingAttendance[] };

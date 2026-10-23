@@ -3,16 +3,17 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { RecentScans } from '../../components/scan/RecentScans';
 import { ScannerPanel } from '../../components/scan/ScannerPanel';
 import { ScanResultScreen } from '../../components/scan/ScanResultScreen';
+import { useScanner } from '../../components/scan/useScanner';
 import { EntrepreneurSearch } from '../../components/shared/EntrepreneurSearch';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { Tabs } from '../../components/ui/Tabs';
 import { formatTime, plural } from '../../lib/format';
-import { registerAttendance, registerAttendanceByCode, type ScanResult } from '../../store/actions';
+import { registerAttendance, registerAttendanceByCode } from '../../store/actions';
 import { useFairState } from '../../store/fairStore';
 import { indexAttendance, indexEntrepreneurs } from '../../store/selectors';
 import type { Entrepreneur, EventDay } from '../../store/types';
-import { useAuth } from '../auth/AuthContext';
+import { useCanEdit } from '../auth/useCanEdit';
 
 // Cada celular de puerta recuerda en qué día está trabajando.
 const DAY_KEY = 'feria-astrea:puerta:dia';
@@ -26,10 +27,10 @@ function readStoredDay(): EventDay {
 }
 
 export function DoorPage() {
-  const { operator } = useAuth();
+  const canEdit = useCanEdit();
   const { entrepreneurs, attendance } = useFairState();
   const [day, setDay] = useState<EventDay>(readStoredDay);
-  const [result, setResult] = useState<ScanResult | null>(null);
+  const { result, busy, run, clear } = useScanner();
   const [lastCode, setLastCode] = useState<string | null>(null);
 
   const attendanceIndex = useMemo(() => indexAttendance(attendance), [attendance]);
@@ -59,7 +60,7 @@ export function DoorPage() {
   function handleCode(code: string) {
     const normalized = code.trim().toUpperCase();
     setLastCode(normalized);
-    setResult(registerAttendanceByCode(normalized, day, operator));
+    void run(() => registerAttendanceByCode(normalized, day));
   }
 
   /** Simula que la cámara lee el QR de alguien que aún no ha entrado ese día. */
@@ -71,7 +72,7 @@ export function DoorPage() {
   }
 
   function handleManual(entrepreneur: Entrepreneur) {
-    setResult(registerAttendance(entrepreneur.id, day, operator, 'manual'));
+    void run(() => registerAttendance(entrepreneur.id, day, 'manual'));
   }
 
   return (
@@ -92,42 +93,50 @@ export function DoorPage() {
         ]}
       />
 
-      <Card title="Escanear QR">
-        {withQr.length === 0 ? (
-          <p className="text-sm text-carbon-600">
-            Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
-          </p>
-        ) : (
-          <ScannerPanel onCode={handleCode} onSimulate={simulateScan} lastCode={lastCode} />
-        )}
-      </Card>
-
-      <Card title="Búsqueda manual" description="Si el QR no lee o la persona no lo trae.">
-        <EntrepreneurSearch
-          entrepreneurs={entrepreneurs}
-          onSelect={handleManual}
-          label="Documento o nombre"
-          placeholder="Ej. 1065812345 o Yarledis"
-          actionLabel="Registrar"
-          renderMeta={(e) => {
-            const record = attendanceIndex.get(e.id)?.[day];
-            return record ? (
-              <Badge tone="success">Ingresó {formatTime(record.at)}</Badge>
+      {canEdit && (
+        <>
+          <Card title="Escanear QR">
+            {withQr.length === 0 ? (
+              <p className="text-sm text-carbon-600">
+                Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
+              </p>
             ) : (
-              <Badge>Sin ingreso el Día {day}</Badge>
-            );
-          }}
-        />
-      </Card>
+              <ScannerPanel onCode={handleCode} onSimulate={simulateScan} lastCode={lastCode} busy={busy} />
+            )}
+          </Card>
+
+          <Card title="Búsqueda manual" description="Si el QR no lee o la persona no lo trae.">
+            <EntrepreneurSearch
+              entrepreneurs={entrepreneurs}
+              onSelect={handleManual}
+              label="Documento o nombre"
+              placeholder="Ej. 1065812345 o Yarledis"
+              actionLabel="Registrar"
+              renderMeta={(e) => {
+                const record = attendanceIndex.get(e.id)?.[day];
+                return record ? (
+                  <Badge tone="success">Ingresó {formatTime(record.at)}</Badge>
+                ) : (
+                  <Badge>Sin ingreso el Día {day}</Badge>
+                );
+              }}
+            />
+          </Card>
+        </>
+      )}
 
       <Card title={`Últimos ingresos del Día ${day}`}>
-        <RecentScans entries={dayEntries.slice(0, 8)} entrepreneurs={entrepreneurIndex} emptyTitle="Todavía no hay ingresos" />
+        <RecentScans
+          entries={dayEntries.slice(0, canEdit ? 8 : 30)}
+          entrepreneurs={entrepreneurIndex}
+          emptyTitle="Todavía no hay ingresos"
+        />
       </Card>
 
       {result && (
         <ScanResultScreen
           result={result}
-          onClose={() => setResult(null)}
+          onClose={clear}
           labels={{
             context: `Día ${day}`,
             ok: 'Ingreso registrado',
