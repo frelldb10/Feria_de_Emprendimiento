@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/*
+  Paleta tomada de los logos:
+  - verde-600, rojo-600 y amarillo-300 son los de la barra y el escudo de la Alcaldía de Astrea.
+  - amarillo-500 y carbon-700 son el amarillo y el gris del logo de la Feria.
+  - carbon-950 es el fondo del logo de la Alcaldía.
+*/
+@theme {
+  --font-sans: "Public Sans Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Poppins", "Segoe UI", system-ui, sans-serif;
+
+  --color-verde-50: #edf8f1;
+  --color-verde-100: #d3eedc;
+  --color-verde-200: #a6dcb8;
+  --color-verde-300: #6cc28c;
+  --color-verde-500: #00a24a;
+  --color-verde-600: #009240;
+  --color-verde-700: #007a35;
+  --color-verde-800: #00622b;
+  --color-verde-900: #0a4a24;
+
+  --color-rojo-50: #fdeeed;
+  --color-rojo-100: #fad6d4;
+  --color-rojo-200: #f3aaa6;
+  --color-rojo-500: #e5413a;
+  --color-rojo-600: #da251d;
+  --color-rojo-700: #b81e17;
+  --color-rojo-800: #921a14;
+
+  --color-amarillo-50: #fffbe0;
+  --color-amarillo-100: #fff5b3;
+  --color-amarillo-300: #fff500;
+  --color-amarillo-400: #f6d417;
+  --color-amarillo-500: #ebbb1b;
+  /* Serie "Día 2" en las gráficas: el amarillo de la Feria oscurecido para que se distinga del verde. */
+  --color-amarillo-600: #d99a00;
+  --color-amarillo-700: #8a6a00;
+  --color-amarillo-900: #4d3b00;
+
+  --color-carbon-50: #f7f6f3;
+  --color-carbon-100: #eeece7;
+  --color-carbon-200: #dedbd3;
+  --color-carbon-300: #c4c0b6;
+  --color-carbon-400: #9c978c;
+  --color-carbon-500: #77736b;
+  --color-carbon-600: #5c5952;
+  --color-carbon-700: #4a4a42;
+  --color-carbon-800: #34332f;
+  --color-carbon-900: #242422;
+  --color-carbon-950: #1d1d1c;
+
+  --animate-scanline: scanline 2.4s ease-in-out infinite alternate;
+  --animate-countdown: countdown linear forwards;
+
+  @keyframes scanline {
+    from { top: 10%; }
+    to { top: 90%; }
+  }
+
+  @keyframes countdown {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    /* Que la barra superior fija no tape el campo al que salta el foco. */
+    scroll-padding-top: 6rem;
+  }
+
+  body {
+    @apply bg-carbon-50 font-sans text-carbon-900 antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-verde-700;
+  }
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body[data-printing="modal"] {
+    overflow: visible !important;
+  }
+
+  body[data-printing="modal"] #root {
+    display: none;
+  }
+}
