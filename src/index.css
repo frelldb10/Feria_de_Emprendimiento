@@ -8,7 +8,11 @@
 */
 @theme {
   --font-sans: "Public Sans Variable", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Poppins", "Segoe UI", system-ui, sans-serif;
+  /* Títulos con la misma letra del texto: más sobria. Poppins queda solo para el logo de la Alcaldía. */
+  --font-display: "Public Sans Variable", "Segoe UI", system-ui, sans-serif;
+  --font-brand: "Poppins", "Segoe UI", system-ui, sans-serif;
+
+  --shadow-card: 0 1px 2px 0 rgb(29 29 28 / 0.05), 0 1px 3px 0 rgb(29 29 28 / 0.04);
 
   --color-verde-50: #edf8f1;
   --color-verde-100: #d3eedc;
@@ -67,8 +71,8 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
-    /* Que la barra superior fija no tape el campo al que salta el foco. */
-    scroll-padding-top: 6rem;
+    /* Que la barra superior fija (con el menú de módulos en el celular) no tape el campo al que salta el foco. */
+    scroll-padding-top: 8rem;
   }
 
   body {

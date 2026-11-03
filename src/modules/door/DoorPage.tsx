@@ -68,62 +68,67 @@ export function DoorPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-xl space-y-5 px-4 py-5 sm:py-8">
+    <div className="mx-auto w-full max-w-xl space-y-5 px-4 py-6 sm:px-6 lg:max-w-6xl lg:px-8 lg:py-8">
       <PageHeader
         title="Control de ingreso"
         description={`${counts[day]} de ${entrepreneurs.length} emprendedores han ingresado el Día ${day}.`}
       />
 
-      <Tabs
-        label="Día del evento"
-        size="lg"
-        value={day}
-        onChange={changeDay}
-        items={[
-          { id: 1, label: 'Día 1', meta: plural(counts[1], 'ingreso') },
-          { id: 2, label: 'Día 2', meta: plural(counts[2], 'ingreso') },
-        ]}
-      />
+      {/* En el celular va todo en una columna; en escritorio, los últimos ingresos a la derecha. */}
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-5">
+          <Tabs
+            label="Día del evento"
+            size="lg"
+            value={day}
+            onChange={changeDay}
+            items={[
+              { id: 1, label: 'Día 1', meta: plural(counts[1], 'ingreso') },
+              { id: 2, label: 'Día 2', meta: plural(counts[2], 'ingreso') },
+            ]}
+          />
 
-      {canEdit && (
-        <>
-          <Card title="Escanear QR">
-            {withQr.length === 0 ? (
-              <p className="text-sm text-carbon-600">
-                Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
-              </p>
-            ) : (
-              <ScannerPanel onCode={handleCode} lastCode={lastCode} busy={busy} showingResult={result !== null} />
-            )}
-          </Card>
-
-          <Card title="Búsqueda manual" description="Si el QR no lee o la persona no lo trae.">
-            <EntrepreneurSearch
-              entrepreneurs={entrepreneurs}
-              onSelect={handleManual}
-              label="Documento o nombre"
-              placeholder="Ej. 1065812345 o Yarledis"
-              actionLabel="Registrar"
-              renderMeta={(e) => {
-                const record = attendanceIndex.get(e.id)?.[day];
-                return record ? (
-                  <Badge tone="success">Ingresó {formatTime(record.at)}</Badge>
+          {canEdit && (
+            <>
+              <Card title="Escanear QR">
+                {withQr.length === 0 ? (
+                  <p className="text-sm text-carbon-600">
+                    Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
+                  </p>
                 ) : (
-                  <Badge>Sin ingreso el Día {day}</Badge>
-                );
-              }}
-            />
-          </Card>
-        </>
-      )}
+                  <ScannerPanel onCode={handleCode} lastCode={lastCode} busy={busy} showingResult={result !== null} />
+                )}
+              </Card>
 
-      <Card title={`Últimos ingresos del Día ${day}`}>
-        <RecentScans
-          entries={dayEntries.slice(0, canEdit ? 8 : 30)}
-          entrepreneurs={entrepreneurIndex}
-          emptyTitle="Todavía no hay ingresos"
-        />
-      </Card>
+              <Card title="Búsqueda manual" description="Si el QR no lee o la persona no lo trae.">
+                <EntrepreneurSearch
+                  entrepreneurs={entrepreneurs}
+                  onSelect={handleManual}
+                  label="Documento o nombre"
+                  placeholder="Ej. 1065812345 o Yarledis"
+                  actionLabel="Registrar"
+                  renderMeta={(e) => {
+                    const record = attendanceIndex.get(e.id)?.[day];
+                    return record ? (
+                      <Badge tone="success">Ingresó {formatTime(record.at)}</Badge>
+                    ) : (
+                      <Badge>Sin ingreso el Día {day}</Badge>
+                    );
+                  }}
+                />
+              </Card>
+            </>
+          )}
+        </div>
+
+        <Card title={`Últimos ingresos del Día ${day}`}>
+          <RecentScans
+            entries={dayEntries.slice(0, canEdit ? 10 : 30)}
+            entrepreneurs={entrepreneurIndex}
+            emptyTitle="Todavía no hay ingresos"
+          />
+        </Card>
+      </div>
 
       {result && (
         <ScanResultScreen

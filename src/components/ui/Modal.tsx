@@ -52,14 +52,14 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          'relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-white shadow-xl outline-none sm:rounded-2xl',
+          'relative flex max-h-[92dvh] w-full flex-col rounded-t-xl bg-white shadow-xl outline-none sm:rounded-xl',
           size === 'lg' ? 'sm:max-w-4xl' : 'sm:max-w-md',
           'print:max-h-none print:max-w-none print:rounded-none print:shadow-none',
         )}
       >
         <header className="flex items-start justify-between gap-4 border-b border-carbon-100 px-5 py-4 print:hidden">
           <div>
-            <h2 id={titleId} className="font-display text-lg font-semibold">
+            <h2 id={titleId} className="text-lg font-semibold tracking-tight">
               {title}
             </h2>
             {description && <p className="mt-0.5 text-sm text-carbon-500">{description}</p>}

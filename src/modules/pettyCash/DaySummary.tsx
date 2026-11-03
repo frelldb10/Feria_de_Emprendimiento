@@ -49,7 +49,8 @@ function Figure({ label, value, highlight }: { label: string; value: number; hig
       <dt className="text-sm text-carbon-600">{label}</dt>
       <dd
         className={cn(
-          'font-display text-xl font-semibold tabular-nums sm:text-2xl',
+          // text-xl en escritorio también: la tarjeta va en media columna y $ 1.250.000 debe caber.
+          'text-xl font-semibold tracking-tight tabular-nums',
           highlight === 'verde' ? 'text-verde-700' : highlight === 'rojo' ? 'text-rojo-700' : 'text-carbon-900',
         )}
       >

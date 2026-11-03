@@ -166,7 +166,7 @@ export function CameraScanner({ onCode, paused }: CameraScannerProps) {
   const on = state.phase === 'on';
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-80 overflow-hidden rounded-2xl bg-carbon-950">
+    <div className="relative mx-auto aspect-square w-full max-w-80 overflow-hidden rounded-xl bg-carbon-950">
       <video ref={videoRef} muted playsInline className={cn('absolute inset-0 size-full object-cover', !on && 'invisible')} />
 
       {on && (

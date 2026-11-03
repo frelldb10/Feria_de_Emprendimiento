@@ -32,7 +32,7 @@ export function Tabs<T extends string | number>({ items, value, onChange, label,
       role="tablist"
       aria-label={label}
       onKeyDown={handleKeyDown}
-      className={cn('grid gap-1 rounded-xl bg-carbon-100 p-1', className)}
+      className={cn('grid gap-1 rounded-lg bg-carbon-100 p-1', className)}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((item) => {
@@ -47,7 +47,7 @@ export function Tabs<T extends string | number>({ items, value, onChange, label,
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(item.id)}
             className={cn(
-              'flex flex-col items-center justify-center rounded-lg px-3 font-semibold transition-colors',
+              'flex flex-col items-center justify-center rounded-md px-3 font-semibold transition-colors',
               size === 'lg' ? 'min-h-14 text-base' : 'min-h-10 text-sm',
               selected ? 'bg-white text-carbon-900 shadow-sm ring-1 ring-carbon-200' : 'text-carbon-600 hover:text-carbon-900',
             )}

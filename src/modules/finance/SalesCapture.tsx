@@ -48,26 +48,30 @@ export function SalesCapture() {
 
   return (
     <div className="space-y-4">
-      <Tabs
-        label="Día"
-        value={day}
-        onChange={setDay}
-        items={[
-          { id: 1, label: 'Día 1', meta: formatMoney(dayTotal(1)) },
-          { id: 2, label: 'Día 2', meta: formatMoney(dayTotal(2)) },
-        ]}
-      />
-      <Tabs
-        label="Corte"
-        size="lg"
-        value={cut}
-        onChange={setCut}
-        items={SALE_CUTS.map((c) => ({
-          id: c,
-          label: `Corte ${c}`,
-          meta: `${daySales.filter((s) => s.cut === c).length} de ${entrepreneurs.length}`,
-        }))}
-      />
+      {/* Día y corte lado a lado desde tableta; en el celular, uno debajo del otro. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Tabs
+          label="Día"
+          size="lg"
+          value={day}
+          onChange={setDay}
+          items={[
+            { id: 1, label: 'Día 1', meta: formatMoney(dayTotal(1)) },
+            { id: 2, label: 'Día 2', meta: formatMoney(dayTotal(2)) },
+          ]}
+        />
+        <Tabs
+          label="Corte"
+          size="lg"
+          value={cut}
+          onChange={setCut}
+          items={SALE_CUTS.map((c) => ({
+            id: c,
+            label: `Corte ${c}`,
+            meta: `${daySales.filter((s) => s.cut === c).length} de ${entrepreneurs.length}`,
+          }))}
+        />
+      </div>
       <Chips<SectionFilter>
         label="Sección"
         value={section}

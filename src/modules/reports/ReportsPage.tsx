@@ -19,7 +19,7 @@ export function ReportsPage() {
           const Icon = report.icon;
           const count = counts.get(report.id) ?? 0;
           return (
-            <article key={report.id} className="flex flex-col rounded-xl border border-carbon-200 bg-white p-5">
+            <article key={report.id} className="flex flex-col rounded-lg border border-carbon-200 bg-white p-5 shadow-card">
               <div className="flex items-start gap-3">
                 <span className="rounded-lg bg-carbon-100 p-2.5 text-carbon-700">
                   <Icon className="size-5" aria-hidden />

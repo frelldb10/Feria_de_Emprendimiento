@@ -29,60 +29,63 @@ export function BonusesPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-xl space-y-5 px-4 py-5 sm:py-8">
+    <div className="mx-auto w-full max-w-xl space-y-5 px-4 py-6 sm:px-6 lg:max-w-6xl lg:px-8 lg:py-8">
       <PageHeader
         title="Bono de emprendimiento"
         description={`${plural(bonuses.length, 'cuenta registrada', 'cuentas registradas')} · ${plural(pending, 'asistente', 'asistentes')} sin cuenta.`}
       />
 
-      <Card title="Registrar cuenta" description="Solo para emprendedores que participaron en la feria (Día 1, Día 2 o ambos).">
-        <div className="space-y-4">
-          <EntrepreneurSearch
-            entrepreneurs={entrepreneurs}
-            onSelect={select}
-            renderMeta={(e) => {
-              if (bonusIndex.has(e.id)) return <Badge tone="success">Cuenta registrada</Badge>;
-              if (attendanceIndex.has(e.id)) return <Badge>Participó · sin cuenta</Badge>;
-              return <Badge tone="danger">Sin asistencia</Badge>;
-            }}
-          />
-          {selected && <BonusDetail key={selected.id} entrepreneur={selected} onClear={() => setSelectedId(null)} />}
-        </div>
-      </Card>
+      {/* En escritorio, las cuentas registradas van a la derecha del formulario. */}
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+        <Card title="Registrar cuenta" description="Solo para emprendedores que participaron en la feria (Día 1, Día 2 o ambos).">
+          <div className="space-y-4">
+            <EntrepreneurSearch
+              entrepreneurs={entrepreneurs}
+              onSelect={select}
+              renderMeta={(e) => {
+                if (bonusIndex.has(e.id)) return <Badge tone="success">Cuenta registrada</Badge>;
+                if (attendanceIndex.has(e.id)) return <Badge>Participó · sin cuenta</Badge>;
+                return <Badge tone="danger">Sin asistencia</Badge>;
+              }}
+            />
+            {selected && <BonusDetail key={selected.id} entrepreneur={selected} onClear={() => setSelectedId(null)} />}
+          </div>
+        </Card>
 
-      <Card
-        title="Cuentas registradas"
-        description="El Excel trae los números completos para hacer las transferencias."
-        actions={<ReportDownloadButton report="bonos" disabled={bonuses.length === 0} />}
-        flush
-      >
-        {recent.length === 0 ? (
-          <EmptyState icon={Landmark} title="Aún no hay cuentas registradas" />
-        ) : (
-          <ol className="divide-y divide-carbon-100">
-            {recent.map((bonus) => {
-              const entrepreneur = entrepreneurIndex.get(bonus.entrepreneurId);
-              return (
-                <li key={bonus.id}>
-                  <button
-                    type="button"
-                    onClick={() => entrepreneur && select(entrepreneur)}
-                    className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-carbon-50 sm:px-5"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold text-carbon-900">{entrepreneur?.businessName}</span>
-                      <span className="block truncate text-sm text-carbon-500">
-                        {bonus.account.bank} · <span className="font-mono">{maskAccount(bonus.account.number)}</span>
+        <Card
+          title="Cuentas registradas"
+          description="El Excel trae los números completos para hacer las transferencias."
+          actions={<ReportDownloadButton report="bonos" disabled={bonuses.length === 0} />}
+          flush
+        >
+          {recent.length === 0 ? (
+            <EmptyState icon={Landmark} title="Aún no hay cuentas registradas" />
+          ) : (
+            <ol className="divide-y divide-carbon-100">
+              {recent.map((bonus) => {
+                const entrepreneur = entrepreneurIndex.get(bonus.entrepreneurId);
+                return (
+                  <li key={bonus.id}>
+                    <button
+                      type="button"
+                      onClick={() => entrepreneur && select(entrepreneur)}
+                      className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-carbon-50 sm:px-5"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold text-carbon-900">{entrepreneur?.businessName}</span>
+                        <span className="block truncate text-sm text-carbon-500">
+                          {bonus.account.bank} · <span className="font-mono">{maskAccount(bonus.account.number)}</span>
+                        </span>
                       </span>
-                    </span>
-                    <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-carbon-500">{formatTime(bonus.at)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </Card>
+                      <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-carbon-500">{formatTime(bonus.at)}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

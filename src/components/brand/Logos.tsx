@@ -22,10 +22,10 @@ export function AlcaldiaLogo({ tone = 'dark', className }: { tone?: 'dark' | 'li
     <div className={cn('flex items-center gap-3', className)}>
       <Escudo className="h-14 shrink-0" />
       <div className="min-w-0">
-        <p className={cn('font-display text-xs leading-tight', light ? 'text-carbon-300' : 'text-carbon-500')}>
+        <p className={cn('font-brand text-xs leading-tight', light ? 'text-carbon-300' : 'text-carbon-500')}>
           Alcaldía Municipal de
         </p>
-        <p className={cn('font-display text-2xl leading-none font-extrabold', light ? 'text-white' : 'text-carbon-800')}>
+        <p className={cn('font-brand text-2xl leading-none font-extrabold', light ? 'text-white' : 'text-carbon-800')}>
           Astrea
         </p>
         <BrandStripe rounded className="mt-1.5 h-1.5 w-full" />

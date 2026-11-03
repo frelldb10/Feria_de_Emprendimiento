@@ -11,7 +11,7 @@ interface EntrepreneurSummaryProps {
 
 export function EntrepreneurSummary({ entrepreneur, onClear, children }: EntrepreneurSummaryProps) {
   return (
-    <div className="rounded-xl border border-carbon-200 bg-white p-4">
+    <div className="rounded-lg border border-carbon-200 bg-white p-4 shadow-card">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold tracking-wide text-carbon-500 uppercase">{entrepreneur.category || 'Emprendimiento'}</p>

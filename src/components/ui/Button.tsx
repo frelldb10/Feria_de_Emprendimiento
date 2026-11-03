@@ -5,11 +5,14 @@ import { cn } from '../../lib/cn';
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'dangerGhost';
 type Size = 'md' | 'lg';
 
+// Desactivado se ve gris claro con el texto apagado, no como un botón de otro color.
 const variants: Record<Variant, string> = {
-  primary: 'bg-verde-700 text-white hover:bg-verde-800 active:bg-verde-900 disabled:bg-carbon-300',
+  primary:
+    'bg-verde-700 text-white shadow-card hover:bg-verde-800 active:bg-verde-900 disabled:bg-carbon-100 disabled:text-carbon-400 disabled:shadow-none',
   secondary:
-    'border border-carbon-300 bg-white text-carbon-800 hover:bg-carbon-100 active:bg-carbon-200 disabled:text-carbon-400',
-  danger: 'bg-rojo-600 text-white hover:bg-rojo-700 active:bg-rojo-800 disabled:bg-carbon-300',
+    'border border-carbon-300 bg-white text-carbon-800 shadow-card hover:bg-carbon-50 active:bg-carbon-100 disabled:border-carbon-200 disabled:text-carbon-400 disabled:shadow-none',
+  danger:
+    'bg-rojo-600 text-white shadow-card hover:bg-rojo-700 active:bg-rojo-800 disabled:bg-carbon-100 disabled:text-carbon-400 disabled:shadow-none',
   ghost: 'text-carbon-700 hover:bg-carbon-100 active:bg-carbon-200 disabled:text-carbon-400',
   dangerGhost: 'text-rojo-700 hover:bg-rojo-50 active:bg-rojo-100 disabled:text-carbon-400',
 };

@@ -34,7 +34,7 @@ export function FileDropzone({ onFile, busy = false }: { onFile: (file: File) =>
           if (file && !busy) onFile(file);
         }}
         className={cn(
-          'flex min-h-44 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors',
+          'flex min-h-44 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors',
           'peer-focus-visible:ring-2 peer-focus-visible:ring-verde-700 peer-focus-visible:ring-offset-2',
           dragging ? 'border-verde-600 bg-verde-50' : 'border-carbon-300 bg-carbon-50 hover:border-carbon-400',
           busy && 'cursor-wait opacity-70',

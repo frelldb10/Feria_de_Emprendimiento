@@ -52,7 +52,7 @@ export function SalesBalance() {
         ]}
       />
 
-      <div className="rounded-xl border border-carbon-200 bg-white px-5 py-4">
+      <div className="rounded-lg border border-carbon-200 bg-white px-5 py-4 shadow-card">
         <p className="text-sm font-medium text-carbon-600">Total vendido · {PERIOD_LABEL[filter]}</p>
         <p className="mt-1 font-display text-4xl font-semibold tabular-nums text-carbon-900">{formatMoney(overall.total)}</p>
         <p className="mt-1 text-sm text-carbon-500">

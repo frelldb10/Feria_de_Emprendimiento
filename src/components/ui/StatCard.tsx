@@ -4,11 +4,12 @@ import { cn } from '../../lib/cn';
 
 type Accent = 'verde' | 'rojo' | 'amarillo' | 'carbon';
 
+// El color solo marca el ícono y la barra de avance; la tarjeta es igual para todas las cifras.
 const accents: Record<Accent, { bar: string; icon: string }> = {
-  verde: { bar: 'bg-verde-600', icon: 'bg-verde-50 text-verde-700' },
-  rojo: { bar: 'bg-rojo-600', icon: 'bg-rojo-50 text-rojo-700' },
-  amarillo: { bar: 'bg-amarillo-400', icon: 'bg-amarillo-50 text-amarillo-700' },
-  carbon: { bar: 'bg-carbon-700', icon: 'bg-carbon-100 text-carbon-700' },
+  verde: { bar: 'bg-verde-600', icon: 'text-verde-700' },
+  rojo: { bar: 'bg-rojo-600', icon: 'text-rojo-600' },
+  amarillo: { bar: 'bg-amarillo-500', icon: 'text-amarillo-700' },
+  carbon: { bar: 'bg-carbon-700', icon: 'text-carbon-600' },
 };
 
 interface StatCardProps {
@@ -24,15 +25,12 @@ interface StatCardProps {
 export function StatCard({ label, value, detail, icon: Icon, accent, progress }: StatCardProps) {
   const style = accents[accent];
   return (
-    <div className="relative overflow-hidden rounded-xl border border-carbon-200 bg-white p-4 sm:p-5">
-      <span aria-hidden className={cn('absolute inset-x-0 top-0 h-1', style.bar)} />
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-lg border border-carbon-200 bg-white p-4 shadow-card sm:p-5">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-carbon-600">{label}</p>
-        <span className={cn('rounded-lg p-2', style.icon)}>
-          <Icon aria-hidden className="size-5" />
-        </span>
+        <Icon aria-hidden className={cn('size-5 shrink-0', style.icon)} />
       </div>
-      <p className="mt-1 font-display text-3xl font-semibold tabular-nums text-carbon-900">{value}</p>
+      <p className="mt-2 text-[1.75rem] leading-tight font-semibold tracking-tight text-carbon-900 tabular-nums">{value}</p>
       {progress !== undefined && (
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-carbon-100">
           <div className={cn('h-full rounded-full', style.bar)} style={{ width: `${Math.round(progress * 100)}%` }} />

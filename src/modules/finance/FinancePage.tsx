@@ -15,9 +15,9 @@ export function FinancePage() {
   const [tab, setTab] = useState<FinanceTab>('capture');
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-5 sm:py-8">
+    <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6 sm:px-6 lg:max-w-4xl lg:px-8 lg:py-8">
       <PageHeader
-        title="Finanzas"
+        title="Ventas"
         description="Ventas por sección, recogidas en dos cortes al día."
         actions={
           <ReportDownloadButton report="ventas" disabled={sales.length === 0}>

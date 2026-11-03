@@ -1,7 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import {
   ChartColumn,
+  ChevronRight,
   DoorOpen,
   Eye,
   FileSpreadsheet,
@@ -47,17 +48,39 @@ interface NavItem {
   end?: boolean;
 }
 
-const ADMIN_NAV: NavItem[] = [
-  { to: '/admin', label: 'Panel', icon: LayoutDashboard, end: true },
-  { to: '/puerta', label: 'Puerta', icon: DoorOpen },
-  { to: '/capacitacion', label: 'Capacitación', icon: GraduationCap },
-  { to: '/logistica', label: 'Logística', icon: Truck },
-  { to: '/bonos', label: 'Bonos', icon: Landmark },
-  { to: '/finanzas', label: 'Finanzas', icon: ChartColumn },
-  { to: '/caja-menor', label: 'Caja menor', icon: Wallet },
-  { to: '/admin/reportes', label: 'Reportes', icon: FileSpreadsheet },
-  { to: '/admin/usuarios', label: 'Usuarios', icon: UserCog },
+const ADMIN_NAV: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'General',
+    items: [
+      { to: '/admin', label: 'Panel', icon: LayoutDashboard, end: true },
+      { to: '/admin/reportes', label: 'Reportes', icon: FileSpreadsheet },
+    ],
+  },
+  {
+    label: 'Operación',
+    items: [
+      { to: '/puerta', label: 'Puerta', icon: DoorOpen },
+      { to: '/capacitacion', label: 'Capacitación', icon: GraduationCap },
+      { to: '/logistica', label: 'Logística', icon: Truck },
+      { to: '/bonos', label: 'Bonos', icon: Landmark },
+    ],
+  },
+  {
+    label: 'Finanzas',
+    items: [
+      { to: '/finanzas', label: 'Ventas', icon: ChartColumn },
+      { to: '/caja-menor', label: 'Caja menor', icon: Wallet },
+    ],
+  },
+  {
+    label: 'Administración',
+    items: [{ to: '/admin/usuarios', label: 'Usuarios', icon: UserCog }],
+  },
 ];
+
+const NAV_ITEMS = ADMIN_NAV.flatMap((group) => group.items);
+
+const todayFormat = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
 
 export function AppShell() {
   const { user } = useAuth();
@@ -80,51 +103,86 @@ export function AppShell() {
   }, [userId]);
 
   return (
-    <div className="min-h-dvh lg:flex">
-      {isAdmin && <AdminSidebar />}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 bg-white print:hidden">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
-            <Escudo className={cn('h-10', isAdmin && 'lg:hidden')} />
-            <span aria-hidden className={cn('h-8 w-px bg-carbon-200', isAdmin && 'lg:hidden')} />
-            <FeriaLogo className="h-10 sm:h-11" />
-            <div className="ml-auto">
-              <AccountMenu />
+    <div className="min-h-dvh">
+      {/* La franja de la Alcaldía queda fija arriba, de lado a lado, también sobre el menú lateral. */}
+      <BrandStripe className="sticky top-0 z-40 h-[3px] print:hidden" />
+      <div className="lg:flex">
+        {isAdmin && <AdminSidebar />}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-[3px] z-30 border-b border-carbon-200 bg-white print:hidden">
+            <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+              <div className={cn('flex items-center gap-3', isAdmin && 'lg:hidden')}>
+                <Escudo className="h-10" />
+                <span aria-hidden className="h-8 w-px bg-carbon-200" />
+                <FeriaLogo className="h-10 sm:h-11" />
+              </div>
+              {isAdmin && <Breadcrumb />}
+              <div className="ml-auto flex items-center gap-4">
+                <p className="hidden text-sm text-carbon-500 first-letter:uppercase xl:block">{todayFormat.format(new Date())}</p>
+                <span aria-hidden className="hidden h-6 w-px bg-carbon-200 xl:block" />
+                <ConnectionStatus online={online} />
+                <AccountMenu />
+              </div>
             </div>
-          </div>
-          <BrandStripe />
-          {isAdmin && <AdminTabs />}
-          {readOnly && (
-            <p className="flex items-center gap-2 bg-amarillo-100 px-4 py-2 text-sm font-semibold text-amarillo-900 sm:px-6">
-              <Eye className="size-4 shrink-0" aria-hidden />
-              Modo observador: puedes ver todo, pero no hacer cambios.
-            </p>
-          )}
-          {!online && (
-            <p role="alert" className="flex items-center gap-2 bg-rojo-600 px-4 py-2 text-sm font-semibold text-white sm:px-6">
-              <WifiOff className="size-4 shrink-0" aria-hidden />
-              Sin internet: no se puede registrar nada hasta que vuelva la conexión.
-            </p>
-          )}
-        </header>
-        <main className="flex-1">
-          {sync.phase === 'ready' ? (
-            <Outlet />
-          ) : sync.phase === 'error' ? (
-            <div className="mx-auto max-w-md px-4 py-16">
-              <StatusAlert tone="danger" title="No se pudieron cargar los datos">
-                {sync.message}
-              </StatusAlert>
-              <Button className="mt-4" icon={RotateCcw} onClick={() => void loadAll()}>
-                Intentar de nuevo
-              </Button>
-            </div>
-          ) : (
-            <LoadingScreen message="Cargando los datos de la feria…" fullScreen={false} />
-          )}
-        </main>
+            {isAdmin && <AdminTabs />}
+            {readOnly && (
+              <p className="flex items-center gap-2 border-t border-amarillo-400/60 bg-amarillo-50 px-4 py-2 text-sm font-semibold text-amarillo-900 sm:px-6">
+                <Eye className="size-4 shrink-0" aria-hidden />
+                Modo observador: puedes ver todo, pero no hacer cambios.
+              </p>
+            )}
+            {!online && (
+              <p role="alert" className="flex items-center gap-2 bg-rojo-600 px-4 py-2 text-sm font-semibold text-white sm:px-6">
+                <WifiOff className="size-4 shrink-0" aria-hidden />
+                Sin internet: no se puede registrar nada hasta que vuelva la conexión.
+              </p>
+            )}
+          </header>
+          <main className="flex-1">
+            {sync.phase === 'ready' ? (
+              <Outlet />
+            ) : sync.phase === 'error' ? (
+              <div className="mx-auto max-w-md px-4 py-16">
+                <StatusAlert tone="danger" title="No se pudieron cargar los datos">
+                  {sync.message}
+                </StatusAlert>
+                <Button className="mt-4" icon={RotateCcw} onClick={() => void loadAll()}>
+                  Intentar de nuevo
+                </Button>
+              </div>
+            ) : (
+              <LoadingScreen message="Cargando los datos de la feria…" fullScreen={false} />
+            )}
+          </main>
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Dónde está el usuario: "Feria de Emprendimiento › Puerta". Solo en escritorio, junto al menú lateral. */
+function Breadcrumb() {
+  const { pathname } = useLocation();
+  const current = NAV_ITEMS.find((item) => (item.end ? pathname === item.to : pathname.startsWith(item.to)));
+  return (
+    <nav aria-label="Ubicación" className="hidden min-w-0 items-center gap-2 text-sm lg:flex">
+      <span className="text-carbon-500">Feria de Emprendimiento</span>
+      {current && (
+        <>
+          <ChevronRight className="size-4 shrink-0 text-carbon-400" aria-hidden />
+          <span className="truncate font-semibold text-carbon-900">{current.label}</span>
+        </>
+      )}
+    </nav>
+  );
+}
+
+function ConnectionStatus({ online }: { online: boolean }) {
+  return (
+    <p className="hidden items-center gap-2 text-sm text-carbon-600 md:flex">
+      <span aria-hidden className={cn('size-2 rounded-full', online ? 'bg-verde-600' : 'bg-rojo-600')} />
+      {online ? 'En línea' : 'Sin conexión'}
+    </p>
   );
 }
 
@@ -132,60 +190,63 @@ function AdminSidebar() {
   // La columna oscura se estira con la página; el contenido del menú se queda fijo al hacer scroll.
   return (
     <div className="hidden w-64 shrink-0 bg-carbon-950 lg:block print:hidden">
-      <AdminSidebarContent />
+      <aside className="sticky top-[3px] flex h-[calc(100dvh-3px)] flex-col text-carbon-300">
+        <div className="border-b border-white/10 px-5 pt-5 pb-5">
+          <AlcaldiaLogo tone="light" />
+          <p className="mt-4 text-xs font-semibold tracking-wider text-carbon-400 uppercase">Feria de Emprendimiento</p>
+        </div>
+        <nav aria-label="Módulos" className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
+          {ADMIN_NAV.map((group) => (
+            <div key={group.label}>
+              <p className="px-3 pb-1.5 text-[0.6875rem] font-semibold tracking-wider text-carbon-500 uppercase">{group.label}</p>
+              <ul className="space-y-0.5">
+                {group.items.map(({ to, label, icon: Icon, end }) => (
+                  <li key={to}>
+                    <NavLink
+                      to={to}
+                      end={end}
+                      className={({ isActive }) =>
+                        cn(
+                          'relative flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
+                          isActive ? 'bg-white/10 text-white' : 'hover:bg-white/5 hover:text-white',
+                        )
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {isActive && <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r bg-amarillo-300" />}
+                          <Icon className={cn('size-[1.125rem]', isActive ? 'text-white' : 'text-carbon-400')} aria-hidden />
+                          {label}
+                        </>
+                      )}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+        <p className="border-t border-white/10 px-5 py-4 text-xs leading-relaxed text-carbon-500">
+          Alcaldía Municipal de Astrea
+          <br />
+          Uso exclusivo del personal autorizado
+        </p>
+      </aside>
     </div>
-  );
-}
-
-function AdminSidebarContent() {
-  return (
-    <aside className="sticky top-0 flex h-dvh flex-col text-carbon-300">
-      <div className="px-5 pt-6 pb-8">
-        <AlcaldiaLogo tone="light" />
-      </div>
-      <nav aria-label="Módulos" className="flex-1 space-y-1 px-3">
-        {ADMIN_NAV.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              cn(
-                'relative flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors',
-                isActive ? 'bg-carbon-800 text-white' : 'hover:bg-carbon-900 hover:text-white',
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-r bg-amarillo-300" />}
-                <Icon className="size-5" aria-hidden />
-                {label}
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-      <p className="px-5 py-5 text-xs leading-relaxed text-carbon-400">
-        Feria de Emprendimiento
-        <br />
-        Alcaldía Municipal de Astrea
-      </p>
-    </aside>
   );
 }
 
 function AdminTabs() {
   return (
-    <nav aria-label="Módulos" className="flex gap-1 overflow-x-auto border-b border-carbon-200 px-3 py-2 lg:hidden">
-      {ADMIN_NAV.map(({ to, label, icon: Icon, end }) => (
+    <nav aria-label="Módulos" className="flex gap-1 overflow-x-auto border-t border-carbon-100 px-3 py-2 lg:hidden">
+      {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
           end={end}
           className={({ isActive }) =>
             cn(
-              'flex h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold',
+              'flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold',
               isActive ? 'bg-carbon-900 text-white' : 'text-carbon-600 hover:bg-carbon-100',
             )
           }

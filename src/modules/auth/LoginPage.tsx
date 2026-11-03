@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router';
-import { LogIn } from 'lucide-react';
+import { ChartColumn, DoorOpen, GraduationCap, Landmark, LogIn, Truck, Wallet } from 'lucide-react';
 import { BrandStripe } from '../../components/brand/BrandStripe';
 import { AlcaldiaLogo, Escudo, FeriaLogo } from '../../components/brand/Logos';
 import { Button } from '../../components/ui/Button';
@@ -12,6 +12,15 @@ import { SUPABASE_CONFIGURED } from '../../lib/supabase';
 import { useAuth } from './AuthContext';
 import { ROLES } from './roles';
 import { cleanUsername } from './users';
+
+const MODULES = [
+  { label: 'Control de ingreso', icon: DoorOpen },
+  { label: 'Capacitación', icon: GraduationCap },
+  { label: 'Logística y kits', icon: Truck },
+  { label: 'Bonos', icon: Landmark },
+  { label: 'Ventas', icon: ChartColumn },
+  { label: 'Caja menor', icon: Wallet },
+];
 
 export function LoginPage() {
   const { status, user, notice, login } = useAuth();
@@ -43,33 +52,43 @@ export function LoginPage() {
   const shownError = error ?? notice;
 
   return (
-    <div className="min-h-dvh bg-white lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+    <div className="min-h-dvh bg-carbon-50 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <aside className="relative hidden flex-col justify-between bg-carbon-950 px-12 py-10 text-white lg:flex">
-        <AlcaldiaLogo tone="light" className="[&_img]:h-20" />
+        <AlcaldiaLogo tone="light" className="[&_img]:h-16" />
         <div className="max-w-md">
-          <p className="font-display text-sm font-semibold tracking-wide text-amarillo-300 uppercase">Feria de Emprendimiento</p>
-          <h1 className="mt-3 font-display text-4xl leading-tight font-semibold">
-            Ingreso, capacitación, logística, bonos y ventas en un solo lugar.
-          </h1>
-          <p className="mt-4 text-carbon-300">
-            Cada persona entra con la cuenta que le asignó el administrador y ve solo lo que necesita en su punto de trabajo.
+          <p className="text-xs font-semibold tracking-wider text-amarillo-300 uppercase">Sistema de gestión</p>
+          <h1 className="mt-3 text-3xl leading-tight font-semibold tracking-tight">Feria de Emprendimiento</h1>
+          <p className="mt-3 leading-relaxed text-carbon-300">
+            Registro y control de la feria en un solo sistema. Cada funcionario entra con su cuenta y ve solo su área de trabajo.
           </p>
+          <ul className="mt-8 grid grid-cols-2 gap-x-6 gap-y-3 text-sm text-carbon-200">
+            {MODULES.map(({ label, icon: Icon }) => (
+              <li key={label} className="flex items-center gap-2.5">
+                <Icon className="size-4 shrink-0 text-carbon-400" aria-hidden />
+                {label}
+              </li>
+            ))}
+          </ul>
         </div>
-        <BrandStripe rounded className="h-2 max-w-xs" />
+        <div className="space-y-3">
+          <BrandStripe rounded className="h-1.5 max-w-48" />
+          <p className="text-xs text-carbon-400">Alcaldía Municipal de Astrea · {new Date().getFullYear()}</p>
+        </div>
       </aside>
 
       <main className="flex min-h-dvh flex-col lg:min-h-0 lg:justify-center">
         <BrandStripe className="lg:hidden" />
-        <div className="mx-auto w-full max-w-md px-4 pt-8 pb-10 sm:px-6">
+        <div className="mx-auto w-full max-w-md px-4 pt-10 pb-10 sm:px-6">
           <div className="flex items-center justify-center gap-4">
-            <Escudo className="h-16 lg:hidden" />
-            <FeriaLogo className="h-16 sm:h-20" />
+            <Escudo className="h-14 lg:hidden" />
+            <span aria-hidden className="h-10 w-px bg-carbon-200 lg:hidden" />
+            <FeriaLogo className="h-14 sm:h-16" />
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5 rounded-lg border border-carbon-200 bg-white p-6 shadow-card sm:p-8" noValidate>
             <div>
-              <h2 className="font-display text-2xl font-semibold">Ingresar</h2>
-              <p className="mt-1 text-sm text-carbon-500">Usa el usuario y la contraseña que te dio el administrador.</p>
+              <h2 className="text-xl font-semibold tracking-tight">Iniciar sesión</h2>
+              <p className="mt-1 text-sm text-carbon-500">Ingresa con el usuario y la contraseña que te asignó el administrador.</p>
             </div>
 
             {!SUPABASE_CONFIGURED && (
@@ -108,10 +127,11 @@ export function LoginPage() {
               {busy ? 'Entrando…' : 'Entrar'}
             </Button>
 
-            <p className="text-sm text-carbon-500">
+            <p className="border-t border-carbon-100 pt-4 text-sm text-carbon-500">
               ¿Olvidaste tu contraseña? Pídele al administrador que la restablezca desde la sección Usuarios.
             </p>
           </form>
+          <p className="mt-6 text-center text-xs text-carbon-500">Acceso exclusivo para el personal autorizado de la feria.</p>
         </div>
       </main>
     </div>

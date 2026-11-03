@@ -42,14 +42,14 @@ export function TrainingPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-xl space-y-5 px-4 py-5 sm:py-8">
+    <div className="mx-auto w-full max-w-xl space-y-5 px-4 py-6 sm:px-6 lg:max-w-6xl lg:px-8 lg:py-8">
       <PageHeader
         title="Asistencia a capacitación"
         description={`${training.attendance.length} de ${entrepreneurs.length} emprendedores asistieron.`}
       />
 
-      <div className="rounded-xl border border-carbon-200 bg-white px-4 py-3.5">
-        <p className="font-display font-semibold text-carbon-900">{info.title}</p>
+      <div className="rounded-lg border border-carbon-200 bg-white px-4 py-3.5 shadow-card sm:px-5">
+        <p className="font-semibold text-carbon-900">{info.title}</p>
         <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-carbon-600">
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="size-4 text-carbon-400" aria-hidden />
@@ -62,44 +62,48 @@ export function TrainingPage() {
         </p>
       </div>
 
-      {canEdit && (
-        <>
-          <Card title="Escanear QR" description="El mismo código que el emprendedor usa para entrar a la feria.">
-            {withQr.length === 0 ? (
-              <p className="text-sm text-carbon-600">
-                Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
-              </p>
-            ) : (
-              <ScannerPanel onCode={handleCode} lastCode={lastCode} busy={busy} showingResult={result !== null} />
-            )}
-          </Card>
+      {/* En el celular va todo en una columna; en escritorio, los últimos registros a la derecha. */}
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+        {canEdit && (
+          <div className="space-y-5">
+            <Card title="Escanear QR" description="El mismo código que el emprendedor usa para entrar a la feria.">
+              {withQr.length === 0 ? (
+                <p className="text-sm text-carbon-600">
+                  Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
+                </p>
+              ) : (
+                <ScannerPanel onCode={handleCode} lastCode={lastCode} busy={busy} showingResult={result !== null} />
+              )}
+            </Card>
 
-          <Card title="Búsqueda manual" description="Si el QR no lee o la persona no lo trae.">
-            <EntrepreneurSearch
-              entrepreneurs={entrepreneurs}
-              onSelect={handleManual}
-              label="Documento o nombre"
-              placeholder="Ej. 1065812345 o Yarledis"
-              actionLabel="Registrar"
-              renderMeta={(e) => {
-                const record = attended.get(e.id);
-                return record ? <Badge tone="success">Asistió {formatTime(record.at)}</Badge> : <Badge>Sin registro</Badge>;
-              }}
-            />
-          </Card>
-        </>
-      )}
+            <Card title="Búsqueda manual" description="Si el QR no lee o la persona no lo trae.">
+              <EntrepreneurSearch
+                entrepreneurs={entrepreneurs}
+                onSelect={handleManual}
+                label="Documento o nombre"
+                placeholder="Ej. 1065812345 o Yarledis"
+                actionLabel="Registrar"
+                renderMeta={(e) => {
+                  const record = attended.get(e.id);
+                  return record ? <Badge tone="success">Asistió {formatTime(record.at)}</Badge> : <Badge>Sin registro</Badge>;
+                }}
+              />
+            </Card>
+          </div>
+        )}
 
-      <Card
-        title="Últimos registros"
-        actions={<ReportDownloadButton report="capacitacion" disabled={training.attendance.length === 0}>Evidencia en Excel</ReportDownloadButton>}
-      >
-        <RecentScans
-          entries={canEdit ? recent : [...training.attendance].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30)}
-          entrepreneurs={entrepreneurIndex}
-          emptyTitle="Todavía no hay asistentes registrados"
-        />
-      </Card>
+        <Card
+          title="Últimos registros"
+          actions={<ReportDownloadButton report="capacitacion" disabled={training.attendance.length === 0}>Evidencia en Excel</ReportDownloadButton>}
+          className={canEdit ? undefined : 'lg:col-span-2'}
+        >
+          <RecentScans
+            entries={canEdit ? recent : [...training.attendance].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30)}
+            entrepreneurs={entrepreneurIndex}
+            emptyTitle="Todavía no hay asistentes registrados"
+          />
+        </Card>
+      </div>
 
       {result && (
         <ScanResultScreen

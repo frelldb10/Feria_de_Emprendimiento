@@ -25,7 +25,7 @@ export function PettyCashPage() {
   const canSpend = isAdmin || user?.role === 'petty_cash';
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-5 sm:py-8">
+    <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6 sm:px-6 lg:max-w-6xl lg:px-8 lg:py-8">
       <PageHeader
         title="Caja menor"
         description="Dinero entregado y gastos de cada día de la feria."
@@ -53,10 +53,17 @@ export function PettyCashPage() {
               meta: days[d].fund ? `Saldo ${formatMoney(days[d].balance)}` : 'Sin asignar',
             }))}
           />
-          <DaySummary key={`resumen-${day}`} summary={summary} canAssign={isAdmin} />
-          {canSpend && <ExpenseForm key={`gasto-${day}`} summary={summary} isAdmin={isAdmin} />}
-          <ExpenseList summary={summary} canDelete={isAdmin} />
-          <CategoryTotals summary={summary} />
+          {/* En escritorio, el resumen y el registro a la izquierda; los gastos a la derecha. */}
+          <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+            <div className="space-y-5">
+              <DaySummary key={`resumen-${day}`} summary={summary} canAssign={isAdmin} />
+              {canSpend && <ExpenseForm key={`gasto-${day}`} summary={summary} isAdmin={isAdmin} />}
+            </div>
+            <div className="space-y-5">
+              <ExpenseList summary={summary} canDelete={isAdmin} />
+              <CategoryTotals summary={summary} />
+            </div>
+          </div>
         </>
       )}
     </div>
