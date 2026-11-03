@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Armchair, Plug, Store, type LucideIcon } from 'lucide-react';
 import { StatusAlert } from '../../components/ui/StatusAlert';
 import { setLogisticsCheck } from '../../store/actions';
+import { standLabel } from '../../store/selectors';
 import type { Entrepreneur, LogisticsCheck, LogisticsField } from '../../store/types';
 import { cn } from '../../lib/cn';
 import { formatTime } from '../../lib/format';
@@ -39,9 +40,9 @@ export function RequirementsPanel({ entrepreneur, check }: { entrepreneur: Entre
       field: 'standReady',
       icon: Store,
       title: 'Stand',
-      value: entrepreneur.stand || 'Sin asignar',
+      value: standLabel(entrepreneur),
       doneLabel: 'Montado',
-      applies: true,
+      applies: entrepreneur.needsStand,
     },
     {
       field: 'powerConnected',

@@ -75,7 +75,8 @@ export function EntrepreneurSearch({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-carbon-900">{entrepreneur.businessName}</span>
                     <span className="block truncate text-sm text-carbon-500">
-                      {entrepreneur.ownerName} · CC {entrepreneur.document}
+                      {entrepreneur.ownerName}
+                      {entrepreneur.document && ` · CC ${entrepreneur.document}`}
                       {entrepreneur.stand && ` · Stand ${entrepreneur.stand}`}
                     </span>
                     {renderMeta && <span className="mt-1 flex flex-wrap gap-1.5">{renderMeta(entrepreneur)}</span>}

@@ -2,6 +2,7 @@ import { Upload, X } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { plural } from '../../lib/format';
+import { standLabel } from '../../store/selectors';
 import { sectionLabel } from '../../store/sections';
 import type { ParseResult } from './parseEntrepreneurFile';
 
@@ -16,11 +17,15 @@ export function ImportPreview({ parsed, onConfirm, onCancel, busy = false }: Imp
   const valid = parsed.rows.filter((r) => r.errors.length === 0 && !r.duplicate).length;
   const withErrors = parsed.rows.filter((r) => r.errors.length > 0).length;
   const duplicates = parsed.rows.filter((r) => r.errors.length === 0 && r.duplicate).length;
+  const withDocument = parsed.rows.some((r) => r.data.document !== '');
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="mr-1 font-semibold text-carbon-800">{parsed.fileName}</span>
+        <span className="mr-1 font-semibold text-carbon-800">
+          {parsed.fileName}
+          {parsed.source && <span className="font-normal text-carbon-500"> · {parsed.source}</span>}
+        </span>
         <Badge tone="success">{plural(valid, 'lista', 'listas')} para cargar</Badge>
         {withErrors > 0 && <Badge tone="danger">{plural(withErrors, 'con error', 'con errores')}</Badge>}
         {duplicates > 0 && <Badge tone="warning">{plural(duplicates, 'duplicada', 'duplicadas')}</Badge>}
@@ -31,9 +36,10 @@ export function ImportPreview({ parsed, onConfirm, onCancel, busy = false }: Imp
           <thead className="sticky top-0 bg-carbon-100 text-xs tracking-wide text-carbon-600 uppercase">
             <tr>
               <th className="px-3 py-2 font-semibold">Fila</th>
-              <th className="px-3 py-2 font-semibold">Documento</th>
-              <th className="px-3 py-2 font-semibold">Emprendedor</th>
               <th className="px-3 py-2 font-semibold">Emprendimiento</th>
+              <th className="px-3 py-2 font-semibold">Responsable</th>
+              <th className="px-3 py-2 font-semibold">Teléfono</th>
+              {withDocument && <th className="px-3 py-2 font-semibold">Documento</th>}
               <th className="px-3 py-2 font-semibold">Sección</th>
               <th className="px-3 py-2 font-semibold">Stand</th>
               <th className="px-3 py-2 font-semibold">Energía</th>
@@ -45,18 +51,19 @@ export function ImportPreview({ parsed, onConfirm, onCancel, busy = false }: Imp
             {parsed.rows.map((row) => (
               <tr key={row.line} className={row.errors.length > 0 ? 'bg-rojo-50/60' : undefined}>
                 <td className="px-3 py-2 tabular-nums text-carbon-500">{row.line}</td>
-                <td className="px-3 py-2 tabular-nums">{row.data.document || '—'}</td>
-                <td className="px-3 py-2">{row.data.ownerName || '—'}</td>
                 <td className="px-3 py-2">{row.data.businessName || '—'}</td>
-                <td className="px-3 py-2">{sectionLabel(row.data.section)}</td>
-                <td className="px-3 py-2">{row.data.stand || '—'}</td>
+                <td className="px-3 py-2">{row.data.ownerName || '—'}</td>
+                <td className="px-3 py-2 tabular-nums">{row.data.phone || '—'}</td>
+                {withDocument && <td className="px-3 py-2 tabular-nums">{row.data.document || '—'}</td>}
+                <td className="px-3 py-2 whitespace-nowrap">{sectionLabel(row.data.section)}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{standLabel(row.data)}</td>
                 <td className="px-3 py-2">{row.data.needsPower ? 'Sí' : 'No'}</td>
                 <td className="px-3 py-2 tabular-nums">{row.data.chairs}</td>
                 <td className="px-3 py-2">
                   {row.errors.length > 0 ? (
                     <span className="font-medium text-rojo-700">{row.errors.join('. ')}</span>
                   ) : row.duplicate ? (
-                    <Badge tone="warning">Documento repetido</Badge>
+                    <Badge tone="warning">Repetido</Badge>
                   ) : (
                     <Badge tone="success">Lista</Badge>
                   )}
@@ -68,7 +75,8 @@ export function ImportPreview({ parsed, onConfirm, onCancel, busy = false }: Imp
       </div>
 
       <p className="text-sm text-carbon-500">
-        Solo se cargan las filas marcadas como listas. Las repetidas ya existen en el sistema o aparecen dos veces en el archivo.
+        Solo se cargan las filas marcadas como listas. Las repetidas (mismo documento, o mismo emprendimiento y responsable) ya
+        existen en el sistema o aparecen dos veces en el archivo. La sección se puede asignar después en la tabla de emprendedores.
       </p>
 
       <div className="flex flex-wrap justify-end gap-2">

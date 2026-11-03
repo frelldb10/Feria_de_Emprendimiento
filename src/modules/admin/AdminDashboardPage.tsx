@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { FileSpreadsheet } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -16,7 +15,6 @@ export function AdminDashboardPage() {
   const navigate = useNavigate();
   const canEdit = useCanEdit();
   const { entrepreneurs } = useFairState();
-  const existingDocuments = useMemo(() => new Set(entrepreneurs.map((e) => e.document)), [entrepreneurs]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -34,7 +32,7 @@ export function AdminDashboardPage() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0 space-y-6">
-          {canEdit && <BulkUpload existingDocuments={existingDocuments} />}
+          {canEdit && <BulkUpload existing={entrepreneurs} />}
           <div className="grid items-start gap-6 lg:grid-cols-2">
             <TrainingSettings />
             {canEdit && <DataControls />}

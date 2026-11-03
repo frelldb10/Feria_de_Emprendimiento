@@ -21,6 +21,12 @@ export function indexEntrepreneurs(entrepreneurs: Entrepreneur[]): Map<string, E
   return new Map(entrepreneurs.map((e) => [e.id, e]));
 }
 
+/** Lo que se muestra como stand: el número asignado, o si lo pone la feria o lo trae el emprendedor. */
+export function standLabel(e: Pick<Entrepreneur, 'stand' | 'needsStand'>): string {
+  if (!e.needsStand) return e.stand ? `${e.stand} · propio` : 'Trae stand propio';
+  return e.stand || 'Necesita stand';
+}
+
 export function isKitComplete(kit: KitDelivery | undefined): boolean {
   return !!kit && Object.values(kit.items).every(Boolean);
 }

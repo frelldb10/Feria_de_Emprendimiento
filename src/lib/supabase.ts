@@ -34,6 +34,10 @@ export function describeError(error: unknown): string {
   if (e?.code === '42501') return e.message && !/permission denied|row-level security/i.test(e.message) ? e.message : 'No tienes permiso para hacer esto.';
   if (e?.code === 'P0001' && e.message) return e.message;
   if (e?.code === '23505') return 'Ese registro ya existe.';
+  // La app es más nueva que la base: falta una columna o el documento sigue siendo obligatorio.
+  if (e?.code === 'PGRST204' || (e?.code === '23502' && /document/.test(e.message ?? ''))) {
+    return 'La base de datos no está actualizada. En Supabase, abre SQL Editor, vuelve a ejecutar supabase/schema.sql e intenta de nuevo.';
+  }
   if (e?.message) return e.message;
   return 'Ocurrió un error inesperado. Intenta de nuevo.';
 }

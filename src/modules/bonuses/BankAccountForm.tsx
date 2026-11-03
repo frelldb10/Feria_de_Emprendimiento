@@ -33,7 +33,7 @@ export function BankAccountForm({ entrepreneur, current, submitLabel, onSubmit, 
   const [form, setForm] = useState<AccountForm>(() => emptyAccountForm(entrepreneur, current));
   const [errors, setErrors] = useState<AccountErrors>({});
   const wallet = isWallet(form.bank);
-  const otherHolder = form.holderDocument !== '' && form.holderDocument !== entrepreneur.document;
+  const otherHolder = entrepreneur.document !== '' && form.holderDocument !== '' && form.holderDocument !== entrepreneur.document;
 
   function update<K extends keyof AccountForm>(key: K, value: AccountForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

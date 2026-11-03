@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { standLabel } from '../../store/selectors';
 import type { Entrepreneur } from '../../store/types';
 
 interface EntrepreneurSummaryProps {
@@ -31,11 +32,11 @@ export function EntrepreneurSummary({ entrepreneur, onClear, children }: Entrepr
       <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-lg bg-carbon-50 px-3 py-2">
           <dt className="text-xs text-carbon-500">Documento</dt>
-          <dd className="font-semibold tabular-nums">{entrepreneur.document}</dd>
+          <dd className="font-semibold tabular-nums">{entrepreneur.document || 'Sin registrar'}</dd>
         </div>
         <div className="rounded-lg bg-carbon-50 px-3 py-2">
           <dt className="text-xs text-carbon-500">Stand</dt>
-          <dd className="font-semibold">{entrepreneur.stand || 'Sin asignar'}</dd>
+          <dd className="font-semibold">{standLabel(entrepreneur)}</dd>
         </div>
         <div className="col-span-2 flex items-baseline justify-between gap-3 rounded-lg bg-carbon-50 px-3 py-2">
           <dt className="text-xs text-carbon-500">Código QR</dt>

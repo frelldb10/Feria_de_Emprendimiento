@@ -1,28 +1,20 @@
 import { useState } from 'react';
-import { FileDown } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
+import { FileDown, FileText } from 'lucide-react';
+import { AsyncButton } from '../../components/ui/AsyncButton';
 import { Card } from '../../components/ui/Card';
 import { StatusAlert } from '../../components/ui/StatusAlert';
 import { plural } from '../../lib/format';
 import { describeError } from '../../lib/supabase';
-import { downloadWorkbook } from '../../lib/xlsx';
 import { importEntrepreneurs } from '../../store/actions';
+import type { Entrepreneur } from '../../store/types';
 import { FileDropzone } from './FileDropzone';
 import { ImportPreview } from './ImportPreview';
-import { parseEntrepreneurFile, TEMPLATE_EXAMPLES, TEMPLATE_HEADERS, type ParseResult } from './parseEntrepreneurFile';
+import { parseEntrepreneurFile, type ParseResult } from './parseEntrepreneurFile';
 
-function downloadTemplate() {
-  const textColumns = new Set(['documento', 'telefono']);
-  return downloadWorkbook('plantilla-emprendedores.xlsx', [
-    {
-      name: 'Emprendedores',
-      columns: TEMPLATE_HEADERS.map((header) => ({ header, text: textColumns.has(header), width: header === 'seccion' ? 24 : 18 })),
-      rows: TEMPLATE_EXAMPLES,
-    },
-  ]);
-}
+// Las plantillas cargan sus librerías solo al descargarlas.
+const loadTemplates = () => import('./templates');
 
-export function BulkUpload({ existingDocuments }: { existingDocuments: Set<string> }) {
+export function BulkUpload({ existing }: { existing: Entrepreneur[] }) {
   const [parsed, setParsed] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,7 +26,7 @@ export function BulkUpload({ existingDocuments }: { existingDocuments: Set<strin
     setImported(null);
     setParsed(null);
     try {
-      setParsed(await parseEntrepreneurFile(file, existingDocuments));
+      setParsed(await parseEntrepreneurFile(file, existing));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo leer el archivo.');
     } finally {
@@ -60,11 +52,16 @@ export function BulkUpload({ existingDocuments }: { existingDocuments: Set<strin
   return (
     <Card
       title="Carga masiva de emprendedores"
-      description="Obligatorias: documento, nombre y emprendimiento. La columna sección define el balance de ventas."
+      description="Columnas: N°, nombre del emprendimiento, responsable, teléfono, y si necesita stand, energía y cuántas sillas. Obligatorias: emprendimiento y responsable."
       actions={
-        <Button variant="secondary" icon={FileDown} onClick={downloadTemplate}>
-          Descargar plantilla
-        </Button>
+        <>
+          <AsyncButton variant="secondary" icon={FileDown} onRun={() => loadTemplates().then((m) => m.downloadExcelTemplate())}>
+            Plantilla Excel
+          </AsyncButton>
+          <AsyncButton variant="secondary" icon={FileText} onRun={() => loadTemplates().then((m) => m.downloadWordTemplate())}>
+            Plantilla Word
+          </AsyncButton>
+        </>
       }
     >
       <div className="space-y-3">

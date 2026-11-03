@@ -219,7 +219,7 @@ export async function downloadKitReport(state: FairState, generatedBy: string): 
                   const e = person(k.entrepreneurId);
                   return [
                     String(i + 1),
-                    [e?.ownerName ?? 'Emprendedor eliminado', e ? `CC ${e.document}` : ''],
+                    [e?.ownerName ?? 'Emprendedor eliminado', e?.document ? `CC ${e.document}` : ''],
                     [e?.businessName ?? '', sectionLabel(e?.section ?? null)],
                     e?.stand || '—',
                     yes(k.items.gorras),
@@ -244,7 +244,7 @@ export async function downloadKitReport(state: FairState, generatedBy: string): 
                   const e = person(k.entrepreneurId);
                   const missing = KIT_ITEMS.filter((item) => !k.items[item.id]).map((item) => item.label);
                   return [
-                    [e?.ownerName ?? '', e ? `CC ${e.document}` : ''],
+                    [e?.ownerName ?? '', e?.document ? `CC ${e.document}` : ''],
                     e?.businessName ?? '',
                     e?.stand || '—',
                     missing.join(', '),
@@ -260,7 +260,7 @@ export async function downloadKitReport(state: FairState, generatedBy: string): 
             : table(
                 ['Documento', 'Emprendedor', 'Emprendimiento', 'Sección', 'Stand', 'Teléfono'],
                 [1700, 3300, 3400, 2600, 1000, 2400],
-                withoutKit.map((e) => [e.document, e.ownerName, e.businessName, sectionLabel(e.section), e.stand || '—', e.phone]),
+                withoutKit.map((e) => [e.document || '—', e.ownerName, e.businessName, sectionLabel(e.section), e.stand || '—', e.phone]),
                 [4],
               ),
 

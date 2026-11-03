@@ -21,13 +21,15 @@ type Row = Record<string, any>;
 
 export const toEntrepreneur = (r: Row): Entrepreneur => ({
   id: r.id,
-  document: r.document,
+  document: r.document ?? '',
   ownerName: r.owner_name,
   businessName: r.business_name,
   phone: r.phone,
   category: r.category,
   section: r.section,
   stand: r.stand,
+  // ?? true: mientras no se haya vuelto a ejecutar schema.sql la columna no existe.
+  needsStand: r.needs_stand ?? true,
   needsPower: r.needs_power,
   chairs: r.chairs,
   qrCode: r.qr_code,

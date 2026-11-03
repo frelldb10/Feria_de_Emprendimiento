@@ -10,7 +10,7 @@ import { useCanEdit } from '../auth/useCanEdit';
 import { generateMissingQrCodes, setEntrepreneurSection } from '../../store/actions';
 import { useFairState } from '../../store/fairStore';
 import { SECTIONS } from '../../store/sections';
-import { indexAttendance, searchEntrepreneurs } from '../../store/selectors';
+import { indexAttendance, searchEntrepreneurs, standLabel } from '../../store/selectors';
 import { EVENT_DAYS, type Entrepreneur, type SectionId } from '../../store/types';
 import { QrSheetModal } from './QrSheetModal';
 
@@ -115,7 +115,7 @@ export function EntrepreneursTable() {
               const attended = attendanceIndex.get(e.id);
               return (
                 <tr key={e.id} className="hover:bg-carbon-50">
-                  <td className="px-4 py-2.5 tabular-nums sm:pl-5">{e.document}</td>
+                  <td className="px-4 py-2.5 tabular-nums sm:pl-5">{e.document || '—'}</td>
                   <td className="px-3 py-2.5 font-medium text-carbon-900">{e.ownerName}</td>
                   <td className="px-3 py-2.5">{e.businessName}</td>
                   <td className="px-3 py-1.5">
@@ -137,7 +137,7 @@ export function EntrepreneursTable() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-xs">{e.stand || '—'}</td>
+                  <td className={cn('px-3 py-2.5 whitespace-nowrap', e.stand ? 'font-mono text-xs' : 'text-carbon-600')}>{standLabel(e)}</td>
                   <td className="px-3 py-2.5">{e.needsPower ? 'Sí' : 'No'}</td>
                   <td className="px-3 py-2.5 tabular-nums">{e.chairs}</td>
                   <td className="px-3 py-2.5">

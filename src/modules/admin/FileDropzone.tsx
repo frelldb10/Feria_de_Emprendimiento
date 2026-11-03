@@ -11,7 +11,7 @@ export function FileDropzone({ onFile, busy = false }: { onFile: (file: File) =>
       <input
         id={id}
         type="file"
-        accept=".xlsx,.csv"
+        accept=".xlsx,.csv,.docx"
         className="peer sr-only"
         disabled={busy}
         onChange={(event) => {
@@ -50,7 +50,7 @@ export function FileDropzone({ onFile, busy = false }: { onFile: (file: File) =>
         </span>
         <span className="text-sm text-carbon-500">
           o <span className="font-semibold text-verde-700 underline underline-offset-2">búscalo en el equipo</span> · Excel
-          (.xlsx) o CSV
+          (.xlsx), CSV o Word (.docx)
         </span>
       </label>
     </div>

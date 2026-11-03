@@ -5,6 +5,7 @@ export type SectionId = 'gastronomia' | 'manualidades' | 'moda';
 
 export interface Entrepreneur {
   id: string;
+  /** Vacío si el archivo de carga no lo traía. */
   document: string;
   ownerName: string;
   businessName: string;
@@ -14,6 +15,8 @@ export interface Entrepreneur {
   section: SectionId | null;
   /** Código del stand asignado; vacío si aún no tiene. */
   stand: string;
+  /** false si trae su propio stand. */
+  needsStand: boolean;
   needsPower: boolean;
   chairs: number;
   /** null hasta que el administrador hace la generación masiva de QR. */

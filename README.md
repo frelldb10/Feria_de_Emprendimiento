@@ -33,7 +33,7 @@ Reglas: el administrador no puede cambiar su propio rol ni desactivarse, y siemp
 | Observador | Ve lo mismo que el administrador (panel, todos los módulos, actividad, reportes y usuarios), pero no puede cambiar nada |
 | Operador de Puerta | Registra el ingreso a la feria con QR, Día 1 y Día 2 |
 | Operador de Capacitación | Registra la asistencia a la capacitación con el mismo QR |
-| Operador de Logística | Stands, energía, sillas, entrega de kits con foto e informe en Word |
+| Operador de Logística | Stands (a quien lo necesita), energía, sillas, entrega de kits con foto e informe en Word |
 | Operador de Bonos | Registra la cuenta bancaria para el bono de emprendimiento y descarga el Excel |
 | Financiero | Registra las ventas de cada emprendedor en dos cortes al día y ve el balance por sección |
 
@@ -78,7 +78,19 @@ src/
 
 ## Carga masiva
 
-En el panel de administración se arrastra un archivo de Excel (.xlsx) o CSV. Las columnas obligatorias son `documento`, `nombre` y `emprendimiento`. Las opcionales son `seccion` (Gastronomía, Manualidades o Moda, Belleza y Estilo), `telefono`, `categoria`, `stand`, `energia` (si/no) y `sillas`. El botón "Descargar plantilla" baja un Excel de ejemplo.
+En el panel de administración se arrastra un archivo de Excel (.xlsx), CSV o Word (.docx). El formato es el de la feria:
+
+| N° | NOMBRE DEL EMPRENDIMIENTO | RESPONSABLE | TELÉFONO | ¿Necesita STAND? | ¿Necesita ENERGÍA? | ¿Cuántas SILLAS? |
+| --- | --- | --- | --- | --- | --- | --- |
+
+Las tres últimas pueden ir agrupadas bajo el título "¿QUÉ NECESITA PARA SU PUESTO?", con el encabezado en dos filas. Obligatorias: nombre del emprendimiento y responsable. En stand y energía va SÍ o NO; en sillas, el número. Los botones "Plantilla Excel" y "Plantilla Word" bajan el formato listo para llenar.
+
+- **Columnas opcionales:** si el archivo trae `documento` o `seccion` (Gastronomía, Manualidades o Moda, Belleza y Estilo), también se leen. Sin sección, se intenta con el tipo de emprendimiento; si no se reconoce, se asigna después en la tabla de emprendedores.
+- **Formulario de inscripción:** el Excel que exporta Google Forms también se lee tal cual: nombre completo, número de identificación, contacto, tipo de emprendimiento, "¿Cuenta con stand propio?" y "¿Requiere electricidad?".
+- **Varias hojas o tablas:** en un Excel con varias hojas, o un Word con varias tablas, se usa la que tiene los encabezados. Si un Word no tiene tablas, cada línea es un emprendedor con los datos separados por tabulador, punto y coma o coma.
+- **Dónde están los encabezados:** pueden estar debajo de un título; se buscan entre las primeras 10 filas.
+- **Repetidos:** un emprendedor está repetido si tiene el mismo documento, o el mismo emprendimiento y responsable.
+- **Formatos viejos:** `.xls` y `.doc` no se leen; hay que guardarlos como `.xlsx` o `.docx`.
 
 Antes de cargar se muestra una vista previa que marca las filas con errores y los documentos repetidos; solo se cargan las filas válidas. Luego, "Generación masiva de QR" asigna un código a cada emprendedor nuevo (formato `FE-0001-K7QM`) y abre una hoja lista para imprimir. Ese mismo código sirve en la puerta y en la capacitación. Para ensayar está el botón "Emprendedores de prueba", que carga 24 ficticios con su QR.
 

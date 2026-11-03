@@ -266,13 +266,15 @@ export async function importEntrepreneurs(rows: NewEntrepreneur[]): Promise<numb
       .from('entrepreneurs')
       .upsert(
         rows.map((r) => ({
-          document: r.document,
+          // Sin documento va null: dos textos vacíos chocarían con la restricción unique.
+          document: r.document || null,
           owner_name: r.ownerName,
           business_name: r.businessName,
           phone: r.phone,
           category: r.category,
           section: r.section,
           stand: r.stand,
+          needs_stand: r.needsStand,
           needs_power: r.needsPower,
           chairs: r.chairs,
         })),

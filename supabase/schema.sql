@@ -83,18 +83,25 @@ create trigger on_auth_user_created
 -- ---------------------------------------------------------------------
 create table if not exists public.entrepreneurs (
   id uuid primary key default gen_random_uuid(),
-  document text not null unique,
+  -- Opcional: el formato de inscripción de la feria no lo pide. Varios null no chocan con unique.
+  document text unique,
   owner_name text not null,
   business_name text not null,
   phone text not null default '',
   category text not null default '',
   section text check (section in ('gastronomia', 'manualidades', 'moda')),
   stand text not null default '',
+  -- false cuando el emprendedor trae su propio stand.
+  needs_stand boolean not null default true,
   needs_power boolean not null default false,
   chairs integer not null default 0 check (chairs >= 0),
   qr_code text unique,
   created_at timestamptz not null default now()
 );
+
+-- Bases creadas con una versión anterior de este archivo.
+alter table public.entrepreneurs alter column document drop not null;
+alter table public.entrepreneurs add column if not exists needs_stand boolean not null default true;
 
 -- La restricción unique (entrepreneur_id, day) es la que bloquea el QR repetido
 -- aunque lo escaneen dos celulares distintos al mismo tiempo.

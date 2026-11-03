@@ -51,6 +51,7 @@ export const DEMO_ENTREPRENEURS: NewEntrepreneur[] = ROWS.map(
     needsPower,
     chairs,
     stand: `${i < 12 ? 'A' : 'B'}-${String((i % 12) + 1).padStart(2, '0')}`,
+    needsStand: true,
   }),
 );
 
