@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Truck,
   UserCog,
+  Wallet,
   WifiOff,
   type LucideIcon,
 } from 'lucide-react';
@@ -53,6 +54,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: '/logistica', label: 'Logística', icon: Truck },
   { to: '/bonos', label: 'Bonos', icon: Landmark },
   { to: '/finanzas', label: 'Finanzas', icon: ChartColumn },
+  { to: '/caja-menor', label: 'Caja menor', icon: Wallet },
   { to: '/admin/reportes', label: 'Reportes', icon: FileSpreadsheet },
   { to: '/admin/usuarios', label: 'Usuarios', icon: UserCog },
 ];

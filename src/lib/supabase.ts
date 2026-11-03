@@ -24,6 +24,12 @@ export function usernameToEmail(username: string): string {
 /** Error con un mensaje ya listo para mostrarle al operador. */
 export class ActionError extends Error {}
 
+/** La tabla no existe en la base: falta volver a ejecutar schema.sql. */
+export function isMissingTable(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === 'PGRST205' || code === '42P01';
+}
+
 /** Mensaje en español para mostrar al operador cuando algo falla contra el servidor. */
 export function describeError(error: unknown): string {
   if (error instanceof ActionError) return error.message;
@@ -34,8 +40,8 @@ export function describeError(error: unknown): string {
   if (e?.code === '42501') return e.message && !/permission denied|row-level security/i.test(e.message) ? e.message : 'No tienes permiso para hacer esto.';
   if (e?.code === 'P0001' && e.message) return e.message;
   if (e?.code === '23505') return 'Ese registro ya existe.';
-  // La app es más nueva que la base: falta una columna o el documento sigue siendo obligatorio.
-  if (e?.code === 'PGRST204' || (e?.code === '23502' && /document/.test(e.message ?? ''))) {
+  // La app es más nueva que la base: falta una tabla, una columna o el documento sigue siendo obligatorio.
+  if (isMissingTable(error) || e?.code === 'PGRST204' || (e?.code === '23502' && /document/.test(e.message ?? ''))) {
     return 'La base de datos no está actualizada. En Supabase, abre SQL Editor, vuelve a ejecutar supabase/schema.sql e intenta de nuevo.';
   }
   if (e?.message) return e.message;

@@ -70,6 +70,7 @@ export function createEmptyState(): FairState {
     kits: [],
     bonuses: [],
     sales: [],
+    pettyCash: { funds: [], expenses: [], installed: true },
     activity: [],
   };
 }

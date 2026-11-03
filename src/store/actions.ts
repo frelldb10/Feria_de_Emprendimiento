@@ -1,7 +1,9 @@
+import { formatMoney } from '../lib/format';
 import { compressImage } from '../lib/image';
 import { photoFileName } from '../lib/photo';
 import { ActionError, describeError, supabase } from '../lib/supabase';
 import { getState } from './fairStore';
+import { categoryLabel } from './pettyCash';
 import { refresh, refreshQuietly, toBonus, toEntrepreneur, toKit } from './remote';
 import { DEMO_ENTREPRENEURS } from './seed';
 import { findByQrCode } from './selectors';
@@ -15,6 +17,8 @@ import type {
   KitItemId,
   LogisticsField,
   NewEntrepreneur,
+  NewPettyCashExpense,
+  PettyCashExpense,
   RegistrationMethod,
   SaleCut,
   SectionId,
@@ -256,6 +260,36 @@ export async function recordSale(entrepreneurId: string, day: EventDay, cut: Sal
   await refresh('sales');
 }
 
+/* ---------- Caja menor ---------- */
+
+/** Fija cuánto dinero se entrega para la caja menor del día; reemplaza el valor anterior. */
+export async function setPettyCashFund(day: EventDay, amount: number): Promise<void> {
+  await run(() => supabase.from('petty_cash_funds').upsert({ day, amount }, { onConflict: 'day' }));
+  logActivity('petty-cash', `Caja menor del Día ${day}: se asignaron ${formatMoney(amount)}`);
+  await refresh('pettyCash');
+}
+
+/** La base vuelve a comprobar que el gasto no pase del saldo, aunque registren dos celulares a la vez. */
+export async function recordPettyCashExpense(expense: NewPettyCashExpense): Promise<void> {
+  await run(() => supabase.from('petty_cash_expenses').insert(expense));
+  logActivity(
+    'petty-cash',
+    `Caja menor del Día ${expense.day}: gasto de ${formatMoney(expense.amount)} en ${categoryLabel(expense.category)}`,
+  );
+  await refresh('pettyCash');
+}
+
+export async function deletePettyCashExpense(expense: PettyCashExpense): Promise<void> {
+  const deleted = await run(() => supabase.from('petty_cash_expenses').delete().eq('id', expense.id).select('id'));
+  // Sin permiso la base no da error: simplemente no borra nada.
+  if (!deleted?.length) throw new ActionError('No se pudo eliminar el gasto. Solo el administrador puede hacerlo.');
+  logActivity(
+    'petty-cash',
+    `Caja menor del Día ${expense.day}: se eliminó el gasto "${expense.description}" de ${formatMoney(expense.amount)}`,
+  );
+  await refresh('pettyCash');
+}
+
 /* ---------- Administración ---------- */
 
 /** Carga solo los documentos nuevos; los que ya existen se ignoran. Devuelve cuántos entraron. */
@@ -315,5 +349,16 @@ export async function loadDemoEntrepreneurs(): Promise<number> {
 /** Borra los datos de la feria (no las cuentas de usuario ni las fotos ya subidas). */
 export async function clearAllData(): Promise<void> {
   await run(() => supabase.rpc('clear_fair_data'));
-  await refresh('entrepreneurs', 'attendance', 'trainingInfo', 'trainingAttendance', 'logistics', 'kits', 'bonuses', 'sales', 'activity');
+  await refresh(
+    'entrepreneurs',
+    'attendance',
+    'trainingInfo',
+    'trainingAttendance',
+    'logistics',
+    'kits',
+    'bonuses',
+    'sales',
+    'pettyCash',
+    'activity',
+  );
 }

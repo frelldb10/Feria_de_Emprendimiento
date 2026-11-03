@@ -1,4 +1,4 @@
-import { describeError, supabase } from '../lib/supabase';
+import { describeError, isMissingTable, supabase } from '../lib/supabase';
 import { DEFAULT_TRAINING } from './seed';
 import { commit, getState, setSyncStatus } from './fairStore';
 import type {
@@ -9,6 +9,8 @@ import type {
   FairState,
   KitDelivery,
   LogisticsCheck,
+  PettyCashExpense,
+  PettyCashFund,
   SaleRecord,
   TrainingAttendance,
   TrainingInfo,
@@ -99,6 +101,23 @@ const toSale = (r: Row): SaleRecord => ({
   operator: r.operator_name,
 });
 
+const toPettyCashFund = (r: Row): PettyCashFund => ({
+  day: r.day,
+  amount: Number(r.amount),
+  at: r.at,
+  operator: r.operator_name,
+});
+
+const toPettyCashExpense = (r: Row): PettyCashExpense => ({
+  id: r.id,
+  day: r.day,
+  amount: Number(r.amount),
+  category: r.category,
+  description: r.description,
+  at: r.at,
+  operator: r.operator_name,
+});
+
 const toActivity = (r: Row): ActivityEntry => ({ id: r.id, at: r.at, kind: r.kind, message: r.message });
 
 /* ---------- Lectura ---------- */
@@ -124,6 +143,7 @@ export type Slice =
   | 'kits'
   | 'bonuses'
   | 'sales'
+  | 'pettyCash'
   | 'activity';
 
 type Updater = (state: FairState) => FairState;
@@ -164,6 +184,17 @@ const loaders: Record<Slice, () => Promise<Updater>> = {
     const rows = (await fetchAll('sales')).map(toSale);
     return (s) => ({ ...s, sales: rows });
   },
+  pettyCash: async () => {
+    try {
+      const [funds, expenses] = await Promise.all([fetchAll('petty_cash_funds', 'day'), fetchAll('petty_cash_expenses')]);
+      const pettyCash = { funds: funds.map(toPettyCashFund), expenses: expenses.map(toPettyCashExpense), installed: true };
+      return (s) => ({ ...s, pettyCash });
+    } catch (error) {
+      // Si la base todavía no tiene la caja menor, el resto de la app sigue funcionando.
+      if (!isMissingTable(error)) throw error;
+      return (s) => ({ ...s, pettyCash: { funds: [], expenses: [], installed: false } });
+    }
+  },
   activity: async () => {
     const { data, error } = await supabase.from('activity').select('*').order('at', { ascending: false }).limit(40);
     if (error) throw error;
@@ -197,16 +228,24 @@ export async function loadAll(): Promise<void> {
 
 /* ---------- Tiempo real ---------- */
 
-const TABLE_SLICE: Record<string, Slice> = {
-  entrepreneurs: 'entrepreneurs',
-  attendance: 'attendance',
-  training_info: 'trainingInfo',
-  training_attendance: 'trainingAttendance',
-  logistics_checks: 'logistics',
-  kit_deliveries: 'kits',
-  bonuses: 'bonuses',
-  sales: 'sales',
-  activity: 'activity',
+// La caja menor va en un canal aparte: si la base todavía no tiene sus tablas, el error de
+// ese canal no corta el tiempo real de los demás módulos.
+const CHANNELS: Record<string, Record<string, Slice>> = {
+  'feria-datos': {
+    entrepreneurs: 'entrepreneurs',
+    attendance: 'attendance',
+    training_info: 'trainingInfo',
+    training_attendance: 'trainingAttendance',
+    logistics_checks: 'logistics',
+    kit_deliveries: 'kits',
+    bonuses: 'bonuses',
+    sales: 'sales',
+    activity: 'activity',
+  },
+  'feria-caja-menor': {
+    petty_cash_funds: 'pettyCash',
+    petty_cash_expenses: 'pettyCash',
+  },
 };
 
 /**
@@ -217,7 +256,6 @@ const TABLE_SLICE: Record<string, Slice> = {
 export function subscribeToChanges(): () => void {
   const pending = new Set<Slice>();
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let connectedBefore = false;
 
   const schedule = (slice: Slice) => {
     pending.add(slice);
@@ -229,18 +267,22 @@ export function subscribeToChanges(): () => void {
     }, 250);
   };
 
-  const channel = supabase.channel('feria-datos');
-  for (const [table, slice] of Object.entries(TABLE_SLICE)) {
-    channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => schedule(slice));
-  }
-  channel.subscribe((status) => {
-    if (status !== 'SUBSCRIBED') return;
-    if (connectedBefore) ALL_SLICES.forEach(schedule);
-    connectedBefore = true;
+  const channels = Object.entries(CHANNELS).map(([name, tables]) => {
+    const channel = supabase.channel(name);
+    for (const [table, slice] of Object.entries(tables)) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => schedule(slice));
+    }
+    let connectedBefore = false;
+    channel.subscribe((status) => {
+      if (status !== 'SUBSCRIBED') return;
+      if (connectedBefore) ALL_SLICES.forEach(schedule);
+      connectedBefore = true;
+    });
+    return channel;
   });
 
   return () => {
     clearTimeout(timer);
-    void supabase.removeChannel(channel);
+    for (const channel of channels) void supabase.removeChannel(channel);
   };
 }

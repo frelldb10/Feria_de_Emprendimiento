@@ -17,7 +17,7 @@ const COPY = {
   },
   clear: {
     title: 'Vaciar todos los datos',
-    body: 'Se borran emprendedores, asistencias, capacitación, kits, bonos y ventas en todos los equipos, para empezar la feria desde cero. Las cuentas de usuario no se borran. No se puede deshacer.',
+    body: 'Se borran emprendedores, asistencias, capacitación, kits, bonos, ventas y caja menor en todos los equipos, para empezar la feria desde cero. Las cuentas de usuario no se borran. No se puede deshacer.',
     confirm: 'Vaciar todo',
   },
 };

@@ -29,7 +29,7 @@ create table if not exists public.profiles (
 -- Roles válidos. "observer" es el administrador de solo lectura: ve todo y no cambia nada.
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check
-  check (role in ('admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance'));
+  check (role in ('admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance', 'petty_cash'));
 
 -- ¿El usuario actual está activo y tiene alguno de estos roles?
 create or replace function private.has_role(roles text[])
@@ -46,7 +46,7 @@ create or replace function private.is_active_user()
 returns boolean
 language sql stable security definer set search_path = ''
 as $$
-  select private.has_role(array['admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance']);
+  select private.has_role(array['admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance', 'petty_cash']);
 $$;
 
 grant execute on function private.has_role(text[]) to authenticated;
@@ -186,6 +186,28 @@ create table if not exists public.sales (
   unique (entrepreneur_id, day, cut)
 );
 
+-- Caja menor: cuánto dinero se entrega cada día y en qué se gasta.
+create table if not exists public.petty_cash_funds (
+  day smallint primary key check (day in (1, 2)),
+  amount bigint not null check (amount >= 0),
+  at timestamptz not null default now(),
+  operator_id uuid references auth.users (id) on delete set null,
+  operator_name text not null default ''
+);
+
+create table if not exists public.petty_cash_expenses (
+  id uuid primary key default gen_random_uuid(),
+  day smallint not null check (day in (1, 2)),
+  amount bigint not null check (amount > 0),
+  category text not null
+    check (category in ('transporte', 'alimentacion', 'papeleria', 'ferreteria', 'aseo', 'imprevistos')),
+  description text not null check (char_length(btrim(description)) between 3 and 200),
+  at timestamptz not null default now(),
+  operator_id uuid references auth.users (id) on delete set null,
+  operator_name text not null default ''
+);
+create index if not exists petty_cash_expenses_day_idx on public.petty_cash_expenses (day);
+
 create table if not exists public.activity (
   id uuid primary key default gen_random_uuid(),
   at timestamptz not null default now(),
@@ -214,7 +236,8 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['attendance', 'training_attendance', 'logistics_checks', 'kit_deliveries', 'bonuses', 'sales'] loop
+  foreach t in array array['attendance', 'training_attendance', 'logistics_checks', 'kit_deliveries', 'bonuses', 'sales',
+                           'petty_cash_funds', 'petty_cash_expenses'] loop
     execute format('drop trigger if exists stamp_operator on public.%I', t);
     execute format(
       'create trigger stamp_operator before insert or update on public.%I for each row execute function private.stamp_operator()',
@@ -253,6 +276,64 @@ create trigger bonus_requires_attendance
   before insert or update on public.bonuses
   for each row execute function private.bonus_requires_attendance();
 
+-- Pesos para los mensajes de error: 1250000 → $ 1.250.000
+create or replace function private.money(value bigint)
+returns text
+language sql immutable set search_path = ''
+as $$
+  select '$ ' || replace(to_char(value, 'FM999,999,999,999,990'), ',', '.');
+$$;
+
+-- Un gasto no puede pasar del saldo del día. La fila del día queda bloqueada mientras se
+-- revisa, así dos celulares no gastan el mismo saldo al mismo tiempo.
+create or replace function private.petty_cash_within_balance()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  assigned bigint;
+  spent bigint;
+begin
+  select f.amount into assigned from public.petty_cash_funds f where f.day = new.day for update;
+  if assigned is null then
+    raise exception 'Todavía no se ha asignado dinero de caja menor para el Día %.', new.day using errcode = 'P0001';
+  end if;
+  select coalesce(sum(e.amount), 0) into spent from public.petty_cash_expenses e where e.day = new.day;
+  if spent + new.amount > assigned then
+    raise exception 'El gasto supera el saldo del Día %: quedan %.', new.day, private.money(assigned - spent)
+      using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists petty_cash_within_balance on public.petty_cash_expenses;
+create trigger petty_cash_within_balance
+  before insert on public.petty_cash_expenses
+  for each row execute function private.petty_cash_within_balance();
+
+-- Lo asignado no puede quedar por debajo de lo que ya se gastó ese día.
+create or replace function private.petty_cash_fund_covers_expenses()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  spent bigint;
+begin
+  select coalesce(sum(e.amount), 0) into spent from public.petty_cash_expenses e where e.day = new.day;
+  if new.amount < spent then
+    raise exception 'El Día % ya tiene gastos por %; lo asignado no puede ser menor.', new.day, private.money(spent)
+      using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists petty_cash_fund_covers_expenses on public.petty_cash_funds;
+create trigger petty_cash_fund_covers_expenses
+  before insert or update on public.petty_cash_funds
+  for each row execute function private.petty_cash_fund_covers_expenses();
+
 
 -- ---------------------------------------------------------------------
 -- Seguridad por filas (RLS): qué puede leer y escribir cada rol.
@@ -266,6 +347,8 @@ alter table public.logistics_checks enable row level security;
 alter table public.kit_deliveries enable row level security;
 alter table public.bonuses enable row level security;
 alter table public.sales enable row level security;
+alter table public.petty_cash_funds enable row level security;
+alter table public.petty_cash_expenses enable row level security;
 alter table public.activity enable row level security;
 
 drop policy if exists "perfil propio o administrador" on public.profiles;
@@ -351,6 +434,29 @@ create policy "ventas: actualiza finanzas" on public.sales
   for update to authenticated
   using (private.has_role(array['admin', 'finance'])) with check (private.has_role(array['admin', 'finance']));
 
+-- Caja menor: el administrador asigna el dinero; el responsable de caja menor registra los gastos.
+-- Un gasto mal registrado solo lo puede eliminar el administrador.
+drop policy if exists "caja menor: leen administrador, observador y caja menor" on public.petty_cash_funds;
+create policy "caja menor: leen administrador, observador y caja menor" on public.petty_cash_funds
+  for select to authenticated using (private.has_role(array['admin', 'observer', 'petty_cash']));
+drop policy if exists "caja menor: asigna el administrador" on public.petty_cash_funds;
+create policy "caja menor: asigna el administrador" on public.petty_cash_funds
+  for insert to authenticated with check (private.has_role(array['admin']));
+drop policy if exists "caja menor: cambia lo asignado el administrador" on public.petty_cash_funds;
+create policy "caja menor: cambia lo asignado el administrador" on public.petty_cash_funds
+  for update to authenticated
+  using (private.has_role(array['admin'])) with check (private.has_role(array['admin']));
+
+drop policy if exists "gastos: leen administrador, observador y caja menor" on public.petty_cash_expenses;
+create policy "gastos: leen administrador, observador y caja menor" on public.petty_cash_expenses
+  for select to authenticated using (private.has_role(array['admin', 'observer', 'petty_cash']));
+drop policy if exists "gastos: registra caja menor" on public.petty_cash_expenses;
+create policy "gastos: registra caja menor" on public.petty_cash_expenses
+  for insert to authenticated with check (private.has_role(array['admin', 'petty_cash']));
+drop policy if exists "gastos: elimina el administrador" on public.petty_cash_expenses;
+create policy "gastos: elimina el administrador" on public.petty_cash_expenses
+  for delete to authenticated using (private.has_role(array['admin']));
+
 drop policy if exists "actividad: la ve el administrador" on public.activity;
 create policy "actividad: la ve el administrador" on public.activity
   for select to authenticated using (private.has_role(array['admin', 'observer']));
@@ -361,18 +467,20 @@ create policy "actividad: la escriben todos los roles" on public.activity
 -- El proyecto se creó sin exponer tablas automáticamente: los permisos van explícitos.
 revoke all on public.profiles, public.entrepreneurs, public.attendance, public.training_info,
   public.training_attendance, public.logistics_checks, public.kit_deliveries, public.bonuses,
-  public.sales, public.activity from anon;
+  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity from anon;
 
 grant select on public.profiles to authenticated;
 grant select, insert, update, delete on public.entrepreneurs to authenticated;
 grant select, insert on public.attendance, public.training_attendance, public.activity to authenticated;
 grant select, update on public.training_info to authenticated;
 grant select, insert, update on public.logistics_checks, public.kit_deliveries, public.bonuses, public.sales to authenticated;
+grant select, insert, update on public.petty_cash_funds to authenticated;
+grant select, insert, delete on public.petty_cash_expenses to authenticated;
 
 -- La función admin-users usa la clave de servicio.
 grant all on public.profiles, public.entrepreneurs, public.attendance, public.training_info,
   public.training_attendance, public.logistics_checks, public.kit_deliveries, public.bonuses,
-  public.sales, public.activity to service_role;
+  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity to service_role;
 
 
 -- ---------------------------------------------------------------------
@@ -476,8 +584,8 @@ begin
   if not private.has_role(array['admin']) then
     raise exception 'Solo el administrador puede vaciar los datos.' using errcode = '42501';
   end if;
-  truncate public.activity, public.sales, public.bonuses, public.kit_deliveries, public.logistics_checks,
-    public.training_attendance, public.attendance, public.entrepreneurs;
+  truncate public.activity, public.petty_cash_expenses, public.petty_cash_funds, public.sales, public.bonuses,
+    public.kit_deliveries, public.logistics_checks, public.training_attendance, public.attendance, public.entrepreneurs;
   update public.training_info set title = 'Capacitación de emprendedores', date = null, place = '' where id = 1;
 end;
 $$;
@@ -518,7 +626,8 @@ declare
   t text;
 begin
   foreach t in array array['profiles', 'entrepreneurs', 'attendance', 'training_info', 'training_attendance',
-                           'logistics_checks', 'kit_deliveries', 'bonuses', 'sales', 'activity'] loop
+                           'logistics_checks', 'kit_deliveries', 'bonuses', 'sales', 'petty_cash_funds',
+                           'petty_cash_expenses', 'activity'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

@@ -1,4 +1,4 @@
-import { ChartColumn, GraduationCap, Landmark, PackageCheck, Users, type LucideIcon } from 'lucide-react';
+import { ChartColumn, GraduationCap, Landmark, PackageCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { fileStamp, formatDateOnly, formatForExport } from '../../lib/format';
 import { downloadWorkbook, type SheetSpec } from '../../lib/xlsx';
 import { sectionLabel } from '../../store/sections';
@@ -6,8 +6,9 @@ import { indexEntrepreneurs, isKitComplete } from '../../store/selectors';
 import type { Entrepreneur, FairState } from '../../store/types';
 import { ACCOUNT_TYPE_LABEL } from '../bonuses/bankAccount';
 import { buildSalesSheets } from '../finance/balance';
+import { buildPettyCashSheets } from '../pettyCash/pettyCashReport';
 
-export type ReportId = 'asistencia' | 'capacitacion' | 'kits' | 'bonos' | 'ventas';
+export type ReportId = 'asistencia' | 'capacitacion' | 'kits' | 'bonos' | 'ventas' | 'caja-menor';
 
 export interface ReportDefinition {
   id: ReportId;
@@ -210,6 +211,15 @@ export const REPORTS: ReportDefinition[] = [
     evidence: 'Resumen, Gastronomía, Manualidades y Moda, Belleza y Estilo',
     count: (state) => state.sales.length,
     sheets: buildSalesSheets,
+  },
+  {
+    id: 'caja-menor',
+    title: 'Caja menor',
+    description: 'Dinero asignado, cada gasto y su categoría, por día.',
+    icon: Wallet,
+    evidence: 'Resumen por día, detalle de cada gasto y totales por categoría',
+    count: (state) => state.pettyCash.expenses.length,
+    sheets: buildPettyCashSheets,
   },
 ];
 

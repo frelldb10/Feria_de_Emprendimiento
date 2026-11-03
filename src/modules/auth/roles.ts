@@ -1,6 +1,6 @@
-import { ChartColumn, DoorOpen, Eye, GraduationCap, Landmark, LayoutDashboard, Truck, type LucideIcon } from 'lucide-react';
+import { ChartColumn, DoorOpen, Eye, GraduationCap, Landmark, LayoutDashboard, Truck, Wallet, type LucideIcon } from 'lucide-react';
 
-export type Role = 'admin' | 'observer' | 'door' | 'logistics' | 'bonuses' | 'training' | 'finance';
+export type Role = 'admin' | 'observer' | 'door' | 'logistics' | 'bonuses' | 'training' | 'finance' | 'petty_cash';
 
 export interface RoleInfo {
   label: string;
@@ -52,9 +52,15 @@ export const ROLES: Record<Role, RoleInfo> = {
     description: 'Ventas por sección en dos cortes al día y balance.',
     icon: ChartColumn,
   },
+  petty_cash: {
+    label: 'Caja Menor',
+    home: '/caja-menor',
+    description: 'Registra los gastos de la caja menor de cada día, con su categoría.',
+    icon: Wallet,
+  },
 };
 
-export const ROLE_ORDER: Role[] = ['admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance'];
+export const ROLE_ORDER: Role[] = ['admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance', 'petty_cash'];
 
 /** Roles con el menú completo del administrador (el observador lo ve todo, pero sin editar). */
 export const OVERSEER_ROLES: Role[] = ['admin', 'observer'];

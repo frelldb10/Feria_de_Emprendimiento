@@ -119,6 +119,30 @@ export interface SaleRecord {
   operator: string;
 }
 
+export type PettyCashCategory = 'transporte' | 'alimentacion' | 'papeleria' | 'ferreteria' | 'aseo' | 'imprevistos';
+
+/** Dinero que el administrador entrega para la caja menor de un día. */
+export interface PettyCashFund {
+  day: EventDay;
+  /** Pesos colombianos, sin decimales. */
+  amount: number;
+  at: string;
+  operator: string;
+}
+
+export interface PettyCashExpense {
+  id: string;
+  day: EventDay;
+  amount: number;
+  category: PettyCashCategory;
+  /** En qué se gastó, ej. "Taxi para traer las carpas". */
+  description: string;
+  at: string;
+  operator: string;
+}
+
+export type NewPettyCashExpense = Pick<PettyCashExpense, 'day' | 'amount' | 'category' | 'description'>;
+
 export type ActivityKind =
   | 'attendance'
   | 'duplicate'
@@ -127,7 +151,8 @@ export type ActivityKind =
   | 'kit'
   | 'bonus'
   | 'import'
-  | 'qr';
+  | 'qr'
+  | 'petty-cash';
 
 export interface ActivityEntry {
   id: string;
@@ -145,5 +170,11 @@ export interface FairState {
   kits: KitDelivery[];
   bonuses: EntrepreneurshipBonus[];
   sales: SaleRecord[];
+  pettyCash: {
+    funds: PettyCashFund[];
+    expenses: PettyCashExpense[];
+    /** false si la base todavía no tiene las tablas de caja menor (falta ejecutar schema.sql). */
+    installed: boolean;
+  };
   activity: ActivityEntry[];
 }

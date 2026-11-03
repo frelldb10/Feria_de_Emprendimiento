@@ -16,6 +16,7 @@ const TrainingPage = lazy(() => import('./modules/training/TrainingPage').then((
 const LogisticsPage = lazy(() => import('./modules/logistics/LogisticsPage').then((m) => ({ default: m.LogisticsPage })));
 const BonusesPage = lazy(() => import('./modules/bonuses/BonusesPage').then((m) => ({ default: m.BonusesPage })));
 const FinancePage = lazy(() => import('./modules/finance/FinancePage').then((m) => ({ default: m.FinancePage })));
+const PettyCashPage = lazy(() => import('./modules/pettyCash/PettyCashPage').then((m) => ({ default: m.PettyCashPage })));
 
 function Page({ allow, children }: { allow: Role[]; children: ReactNode }) {
   return (
@@ -47,6 +48,7 @@ export function App() {
             <Route path="/logistica" element={<Page allow={['admin', 'observer', 'logistics']}><LogisticsPage /></Page>} />
             <Route path="/bonos" element={<Page allow={['admin', 'observer', 'bonuses']}><BonusesPage /></Page>} />
             <Route path="/finanzas" element={<Page allow={['admin', 'observer', 'finance']}><FinancePage /></Page>} />
+            <Route path="/caja-menor" element={<Page allow={['admin', 'observer', 'petty_cash']}><PettyCashPage /></Page>} />
           </Route>
           <Route path="*" element={<HomeRedirect />} />
         </Routes>

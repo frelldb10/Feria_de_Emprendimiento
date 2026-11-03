@@ -42,7 +42,7 @@ Los demás usuarios ya no se crean aquí: el administrador los crea desde la app
 
 Si cambia `supabase/schema.sql`, se vuelve a pegar completo en el **SQL Editor** y se ejecuta: no borra datos. Si cambia `supabase/functions/admin-users/index.ts`, en **Edge Functions → admin-users → Code** se reemplaza el código, se hace **Deploy** y se revisa que "Verify JWT" siga desactivado.
 
-Roles disponibles: `admin` (administrador), `observer` (administrador de solo lectura), `door`, `training`, `logistics`, `bonuses` y `finance`.
+Roles disponibles: `admin` (administrador), `observer` (administrador de solo lectura), `door`, `training`, `logistics`, `bonuses`, `finance` y `petty_cash` (caja menor).
 
 ## 4. La app
 

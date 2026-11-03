@@ -1,4 +1,4 @@
-import { Ban, CircleCheck, GraduationCap, Landmark, PackageCheck, QrCode, ScanQrCode, Upload, type LucideIcon } from 'lucide-react';
+import { Ban, CircleCheck, GraduationCap, Landmark, PackageCheck, QrCode, ScanQrCode, Upload, Wallet, type LucideIcon } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { cn } from '../../lib/cn';
@@ -15,6 +15,7 @@ const KIND_STYLE: Record<ActivityKind, { icon: LucideIcon; className: string }> 
   bonus: { icon: Landmark, className: 'bg-carbon-100 text-carbon-700' },
   import: { icon: Upload, className: 'bg-carbon-100 text-carbon-700' },
   qr: { icon: QrCode, className: 'bg-carbon-100 text-carbon-700' },
+  'petty-cash': { icon: Wallet, className: 'bg-amarillo-50 text-amarillo-700' },
 };
 
 export function ActivityFeed() {
@@ -23,7 +24,7 @@ export function ActivityFeed() {
   return (
     <Card
       title="Actividad reciente"
-      description="Se actualiza sola con ingresos, capacitación, kits y bonos."
+      description="Se actualiza sola con ingresos, capacitación, kits, bonos y caja menor."
       flush
     >
       {activity.length === 0 ? (

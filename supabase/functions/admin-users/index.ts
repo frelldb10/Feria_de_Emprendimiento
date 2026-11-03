@@ -8,7 +8,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 // Debe coincidir con USERNAME_EMAIL_DOMAIN en src/lib/supabase.ts.
 const EMAIL_DOMAIN = 'feria-astrea.local';
-const ROLES = ['admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance'];
+const ROLES = ['admin', 'observer', 'door', 'training', 'logistics', 'bonuses', 'finance', 'petty_cash'];
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,30}$/;
 const NAME_PATTERN = /^\p{L}[\p{L}\s.&'-]*$/u;
 const FOREVER = '876000h';
@@ -99,7 +99,9 @@ Deno.serve(async (req) => {
         if (user.role === 'admin' && role !== 'admin' && user.active && (await activeAdmins()) <= 1) {
           throw new Refused('Debe quedar al menos un administrador activo.');
         }
-        await admin.from('profiles').update({ role, updated_at: new Date().toISOString() }).eq('id', user.id);
+        // Si la base no conoce el rol (falta ejecutar schema.sql) se avisa en vez de no hacer nada.
+        const { error } = await admin.from('profiles').update({ role, updated_at: new Date().toISOString() }).eq('id', user.id);
+        if (error) throw new Refused(`No se pudo cambiar el rol: ${error.message}`);
         await admin.auth.admin.updateUserById(user.id, { app_metadata: { role } });
         return reply({ ok: true });
       }
