@@ -72,5 +72,6 @@ export function createEmptyState(): FairState {
     sales: [],
     pettyCash: { funds: [], expenses: [], installed: true },
     activity: [],
+    editions: { list: [], installed: true },
   };
 }

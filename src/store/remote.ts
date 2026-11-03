@@ -6,6 +6,7 @@ import type {
   AttendanceRecord,
   EntrepreneurshipBonus,
   Entrepreneur,
+  FairEdition,
   FairState,
   KitDelivery,
   LogisticsCheck,
@@ -120,6 +121,15 @@ const toPettyCashExpense = (r: Row): PettyCashExpense => ({
 
 const toActivity = (r: Row): ActivityEntry => ({ id: r.id, at: r.at, kind: r.kind, message: r.message });
 
+const toEdition = (r: Row): FairEdition => ({
+  id: r.id,
+  name: r.name,
+  summary: r.summary,
+  entrepreneurs: r.entrepreneurs ?? [],
+  at: r.at,
+  operator: r.operator_name,
+});
+
 /* ---------- Lectura ---------- */
 
 /** PostgREST devuelve máximo 1000 filas por consulta; se pide por páginas. */
@@ -144,7 +154,8 @@ export type Slice =
   | 'bonuses'
   | 'sales'
   | 'pettyCash'
-  | 'activity';
+  | 'activity'
+  | 'editions';
 
 type Updater = (state: FairState) => FairState;
 
@@ -201,6 +212,16 @@ const loaders: Record<Slice, () => Promise<Updater>> = {
     const rows = data.map(toActivity);
     return (s) => ({ ...s, activity: rows });
   },
+  editions: async () => {
+    const { data, error } = await supabase.from('fair_editions').select('*').order('at', { ascending: false });
+    if (error) {
+      // Sin la tabla del historial, el resto de la app sigue funcionando.
+      if (!isMissingTable(error)) throw error;
+      return (s) => ({ ...s, editions: { list: [], installed: false } });
+    }
+    const list = data.map(toEdition);
+    return (s) => ({ ...s, editions: { list, installed: true } });
+  },
 };
 
 const ALL_SLICES = Object.keys(loaders) as Slice[];
@@ -228,8 +249,8 @@ export async function loadAll(): Promise<void> {
 
 /* ---------- Tiempo real ---------- */
 
-// La caja menor va en un canal aparte: si la base todavía no tiene sus tablas, el error de
-// ese canal no corta el tiempo real de los demás módulos.
+// La caja menor y el historial van en un canal aparte: si la base todavía no tiene sus tablas,
+// el error de ese canal no corta el tiempo real de los demás módulos.
 const CHANNELS: Record<string, Record<string, Slice>> = {
   'feria-datos': {
     entrepreneurs: 'entrepreneurs',
@@ -242,9 +263,10 @@ const CHANNELS: Record<string, Record<string, Slice>> = {
     sales: 'sales',
     activity: 'activity',
   },
-  'feria-caja-menor': {
+  'feria-modulos-nuevos': {
     petty_cash_funds: 'pettyCash',
     petty_cash_expenses: 'pettyCash',
+    fair_editions: 'editions',
   },
 };
 

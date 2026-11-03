@@ -1,23 +1,31 @@
 import { useMemo, useState } from 'react';
-import { Printer, QrCode, Search } from 'lucide-react';
+import { Printer, QrCode, Search, Trash2, UserPlus } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { Modal } from '../../components/ui/Modal';
 import { StatusAlert } from '../../components/ui/StatusAlert';
 import { cn } from '../../lib/cn';
+import { plural } from '../../lib/format';
 import { describeError } from '../../lib/supabase';
 import { useCanEdit } from '../auth/useCanEdit';
-import { generateMissingQrCodes, setEntrepreneurSection } from '../../store/actions';
+import { deleteEntrepreneur, generateMissingQrCodes, setEntrepreneurSection } from '../../store/actions';
 import { useFairState } from '../../store/fairStore';
 import { SECTIONS } from '../../store/sections';
 import { indexAttendance, searchEntrepreneurs, standLabel } from '../../store/selectors';
 import { EVENT_DAYS, type Entrepreneur, type SectionId } from '../../store/types';
+import { NewEntrepreneurModal } from './NewEntrepreneurModal';
 import { QrSheetModal } from './QrSheetModal';
 
 export function EntrepreneursTable() {
   const canEdit = useCanEdit();
-  const { entrepreneurs, attendance } = useFairState();
+  const state = useFairState();
+  const { entrepreneurs, attendance } = state;
   const [query, setQuery] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [removing, setRemoving] = useState<Entrepreneur | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeFailure, setRemoveFailure] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ title: string; list: Entrepreneur[] } | null>(null);
 
   const attendanceIndex = useMemo(() => indexAttendance(attendance), [attendance]);
@@ -42,6 +50,37 @@ export function EntrepreneursTable() {
     }
   }
 
+  function closeRemove() {
+    if (removeBusy) return;
+    setRemoving(null);
+    setRemoveFailure(null);
+  }
+
+  async function confirmRemove() {
+    if (!removing) return;
+    setRemoveBusy(true);
+    setRemoveFailure(null);
+    try {
+      await deleteEntrepreneur(removing);
+      setRemoving(null);
+    } catch (error) {
+      setRemoveFailure(describeError(error));
+    } finally {
+      setRemoveBusy(false);
+    }
+  }
+
+  /** Lo que se borra junto con el emprendedor, para que el administrador lo vea antes de confirmar. */
+  const removingLinked = removing
+    ? [
+        plural(state.attendance.filter((a) => a.entrepreneurId === removing.id).length, 'ingreso'),
+        state.training.attendance.some((a) => a.entrepreneurId === removing.id) ? 'su asistencia a la capacitación' : null,
+        state.kits.some((k) => k.entrepreneurId === removing.id) ? 'la entrega del kit' : null,
+        state.bonuses.some((b) => b.entrepreneurId === removing.id) ? 'su cuenta para el bono' : null,
+        plural(state.sales.filter((x) => x.entrepreneurId === removing.id).length, 'registro de ventas', 'registros de ventas'),
+      ].filter(Boolean)
+    : [];
+
   async function changeSection(entrepreneurId: string, section: SectionId | null) {
     setFailure(null);
     try {
@@ -58,6 +97,11 @@ export function EntrepreneursTable() {
       flush
       actions={
         <>
+          {canEdit && (
+            <Button variant="secondary" icon={UserPlus} onClick={() => setCreating(true)}>
+              Nuevo emprendedor
+            </Button>
+          )}
           <Button
             variant="secondary"
             icon={Printer}
@@ -107,7 +151,12 @@ export function EntrepreneursTable() {
               <th className="px-3 py-2.5 font-semibold">Energía</th>
               <th className="px-3 py-2.5 font-semibold">Sillas</th>
               <th className="px-3 py-2.5 font-semibold">Código QR</th>
-              <th className="px-3 py-2.5 font-semibold sm:pr-5">Asistencia</th>
+              <th className={cn('px-3 py-2.5 font-semibold', !canEdit && 'sm:pr-5')}>Asistencia</th>
+              {canEdit && (
+                <th className="px-3 py-2.5 sm:pr-5">
+                  <span className="sr-only">Acciones</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-carbon-100">
@@ -143,7 +192,7 @@ export function EntrepreneursTable() {
                   <td className="px-3 py-2.5">
                     {e.qrCode ? <span className="font-mono text-xs whitespace-nowrap">{e.qrCode}</span> : <Badge tone="warning">Pendiente</Badge>}
                   </td>
-                  <td className="px-3 py-2.5 sm:pr-5">
+                  <td className={cn('px-3 py-2.5', !canEdit && 'sm:pr-5')}>
                     <span className="flex gap-1">
                       {EVENT_DAYS.map((day) => (
                         <span
@@ -159,6 +208,19 @@ export function EntrepreneursTable() {
                       ))}
                     </span>
                   </td>
+                  {canEdit && (
+                    <td className="px-3 py-1.5 text-right sm:pr-5">
+                      <button
+                        type="button"
+                        onClick={() => setRemoving(e)}
+                        className="rounded-lg p-2 text-carbon-400 hover:bg-rojo-50 hover:text-rojo-700"
+                        aria-label={`Eliminar a ${e.businessName}`}
+                        title="Eliminar emprendedor"
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -172,6 +234,36 @@ export function EntrepreneursTable() {
       </div>
 
       <QrSheetModal entrepreneurs={sheet?.list ?? null} title={sheet?.title ?? ''} onClose={() => setSheet(null)} />
+      <NewEntrepreneurModal
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(created) => setSheet({ title: `Código QR de ${created.businessName}`, list: [created] })}
+      />
+      <Modal
+        open={removing !== null}
+        onClose={closeRemove}
+        title="Eliminar emprendedor"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeRemove} disabled={removeBusy}>
+              Cancelar
+            </Button>
+            <Button variant="danger" icon={Trash2} onClick={() => void confirmRemove()} disabled={removeBusy}>
+              {removeBusy ? 'Eliminando…' : 'Eliminar'}
+            </Button>
+          </>
+        }
+      >
+        {removing && (
+          <div className="space-y-3">
+            {removeFailure && <StatusAlert tone="danger" title={removeFailure} />}
+            <p className="text-carbon-700">
+              Se elimina a <span className="font-semibold text-carbon-900">{removing.businessName}</span> ({removing.ownerName}) en todos los
+              equipos, junto con: {removingLinked.join(', ')}. Su código QR deja de servir. No se puede deshacer.
+            </p>
+          </div>
+        )}
+      </Modal>
     </Card>
   );
 }

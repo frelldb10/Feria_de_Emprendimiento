@@ -152,7 +152,47 @@ export type ActivityKind =
   | 'bonus'
   | 'import'
   | 'qr'
-  | 'petty-cash';
+  | 'petty-cash'
+  | 'correction'
+  | 'archive';
+
+/**
+ * Cifras de una feria guardada en el historial. Si cambia la forma, se sube version y la
+ * pantalla de historial sigue leyendo las versiones viejas.
+ */
+export interface EditionSummary {
+  version: 1;
+  training: { title: string; date: string; attendees: number };
+  entrepreneurs: number;
+  attendance: { day1: number; day2: number; anyDay: number; bothDays: number };
+  kits: { complete: number; partial: number };
+  bonusAccounts: number;
+  sales: { day1: number; day2: number; total: number; reporters: number };
+  bySection: { label: string; entrepreneurs: number; sales: number }[];
+  pettyCash: { assigned: number; spent: number; byCategory: { label: string; total: number }[] };
+}
+
+/** Resultado de un emprendedor en una feria guardada. No lleva teléfono ni cuenta bancaria. */
+export interface EditionEntrepreneur {
+  businessName: string;
+  ownerName: string;
+  document: string;
+  section: string;
+  days: EventDay[];
+  training: boolean;
+  kit: 'completo' | 'parcial' | 'pendiente';
+  bonus: boolean;
+  sales: { day1: number; day2: number };
+}
+
+export interface FairEdition {
+  id: string;
+  name: string;
+  summary: EditionSummary;
+  entrepreneurs: EditionEntrepreneur[];
+  at: string;
+  operator: string;
+}
 
 export interface ActivityEntry {
   id: string;
@@ -177,4 +217,10 @@ export interface FairState {
     installed: boolean;
   };
   activity: ActivityEntry[];
+  editions: {
+    /** De la más reciente a la más antigua. */
+    list: FairEdition[];
+    /** false si la base todavía no tiene la tabla del historial (falta ejecutar schema.sql). */
+    installed: boolean;
+  };
 }

@@ -38,7 +38,7 @@ Reglas: el administrador no puede cambiar su propio rol ni desactivarse, y siemp
 
 | Rol | Qué hace |
 | --- | --- |
-| Administrador | Ve y cambia todo: panel, carga masiva, códigos QR, datos de la capacitación, reportes y usuarios |
+| Administrador | Ve y cambia todo: panel, carga masiva, emprendedores (agregar y eliminar), códigos QR, corrección de ingresos en puerta, datos de la capacitación, reportes, historial y usuarios |
 | Observador | Ve lo mismo que el administrador (panel, todos los módulos, actividad, reportes y usuarios), pero no puede cambiar nada |
 | Operador de Puerta | Registra el ingreso a la feria con QR, Día 1 y Día 2 |
 | Operador de Capacitación | Registra la asistencia a la capacitación con el mismo QR |
@@ -84,6 +84,7 @@ src/
     finance/     Ventas por corte, balance por sección y comparación de días
     pettyCash/   Caja menor: dinero de cada día, gastos por categoría y reporte
     reports/     Los seis reportes en Excel
+    history/     Historial de ferias: resumen guardado, comparación y Excel
   store/         Copia en pantalla de los datos, lectura del servidor, acciones y reglas
   lib/           Cliente de Supabase, Excel, fechas, fotos
 ```
@@ -109,12 +110,21 @@ Antes de cargar se muestra una vista previa que marca las filas con errores y lo
 ## Reglas de la feria
 
 - **Lectura del QR:** con la cámara del celular, en Puerta y Capacitación. La primera vez se toca "Encender cámara" y se da el permiso; después se enciende sola al entrar. Un QR que se queda frente a la cámara no se registra dos veces. Hay botón de linterna y de cambiar de cámara cuando el celular los tiene. La cámara solo funciona desde una dirección `https://` (la de Vercel, o `localhost` en el computador). El campo "Código del QR" sirve con lectores QR de mano (USB o Bluetooth).
-- **Puerta:** un mismo QR solo entra una vez por día. El segundo intento muestra la pantalla roja con la hora y quién registró el primero.
+- **Puerta:** un mismo QR solo entra una vez por día. El segundo intento muestra la pantalla roja con la hora y quién registró el primero. Solo el administrador ve, en Puerta, todos los ingresos del día con un botón para eliminar uno mal registrado, y el botón "Nuevo emprendedor" para quien llega sin estar inscrito: se crea con su QR y queda con el ingreso registrado.
+- **Emprendedores:** el administrador también los agrega uno a uno o los elimina desde la tabla del panel. Eliminar uno borra con él sus ingresos, capacitación, logística, kit, cuenta del bono y ventas; antes de confirmar se muestra qué se borra.
 - **Capacitación:** una sola sesión; el administrador define nombre, fecha y lugar. Cada emprendedor queda registrado una vez.
 - **Bono de emprendimiento:** solo para quien participó en la feria (Día 1, Día 2 o ambos). Se registra entidad, tipo de cuenta, número (escrito dos veces y sin poder pegarlo), titular (nombre y apellido, solo letras), documento del titular y la autorización de datos (Ley 1581 de 2012). Nequi y Daviplata piden el celular. El pago se hace por transferencia después de la feria con el Excel.
 - **Ventas:** dos cortes al día. Corte 1: lo vendido desde que abrió el stand. Corte 2 (cierre): lo vendido desde el corte 1. Un $0 cuenta como reportado; un corte vacío aparece como "sin reporte". El balance abre con la comparación Día 1 frente a Día 2.
 - **Kits:** se puede registrar una entrega parcial y completarla después; cada registro exige foto, que se achica antes de subirla para que no tarde.
 - **Caja menor:** el administrador escribe cuánto dinero se entrega para el Día 1 y para el Día 2; si entrega más durante el día, escribe el nuevo total. Cada gasto lleva valor, categoría (transporte, alimentación y refrigerios, papelería e impresiones, ferretería y materiales, aseo o imprevistos) y descripción; la hora y quién lo registró los pone el servidor. Cada día se lleva aparte: lo que sobra del Día 1 no pasa al Día 2. Un gasto mal registrado solo lo elimina el administrador, y queda anotado en la actividad.
+
+## Historial de ferias
+
+Al terminar una feria, el administrador entra a **Historial** y toca "Guardar feria actual". Se guardan las cifras (inscritos, ingresos por día, capacitación, kits, bonos, ventas por día y sección, caja menor) y la lista de emprendedores con sus resultados. No se guardan teléfonos, cuentas bancarias ni fotos: si se necesitan, se descargan antes los reportes.
+
+Al guardar se puede marcar "Vaciar los datos para empezar la nueva feria"; la base guarda y vacía en un solo paso, así que si algo falla no se pierde nada. Las cuentas de usuario y el historial se mantienen.
+
+La pantalla compara la feria en curso con las guardadas, cifra por cifra, con el cambio frente a la anterior, y cuenta cuántos emprendedores ya habían participado. Cada feria guardada se descarga en Excel. El observador ve el historial; solo el administrador guarda y elimina.
 
 ## Reportes
 

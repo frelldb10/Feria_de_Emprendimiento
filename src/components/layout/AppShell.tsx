@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import {
   ChartColumn,
@@ -7,13 +7,16 @@ import {
   Eye,
   FileSpreadsheet,
   GraduationCap,
+  History,
   Landmark,
   LayoutDashboard,
+  Menu,
   RotateCcw,
   Truck,
   UserCog,
   Wallet,
   WifiOff,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../../modules/auth/AuthContext';
@@ -54,6 +57,7 @@ const ADMIN_NAV: { label: string; items: NavItem[] }[] = [
     items: [
       { to: '/admin', label: 'Panel', icon: LayoutDashboard, end: true },
       { to: '/admin/reportes', label: 'Reportes', icon: FileSpreadsheet },
+      { to: '/admin/historial', label: 'Historial', icon: History },
     ],
   },
   {
@@ -88,6 +92,7 @@ export function AppShell() {
   const readOnly = user?.role === 'observer';
   const sync = useSyncStatus();
   const online = useOnline();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Con la sesión abierta se traen los datos y se escuchan los cambios de los demás equipos.
   const userId = user?.id;
@@ -111,6 +116,17 @@ export function AppShell() {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-[3px] z-30 border-b border-carbon-200 bg-white print:hidden">
             <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(true)}
+                  className="-ml-2 rounded-lg p-2 text-carbon-700 hover:bg-carbon-100 lg:hidden"
+                  aria-label="Abrir el menú de módulos"
+                  aria-expanded={menuOpen}
+                >
+                  <Menu className="size-6" aria-hidden />
+                </button>
+              )}
               <div className={cn('flex items-center gap-3', isAdmin && 'lg:hidden')}>
                 <Escudo className="h-10" />
                 <span aria-hidden className="h-8 w-px bg-carbon-200" />
@@ -124,7 +140,6 @@ export function AppShell() {
                 <AccountMenu />
               </div>
             </div>
-            {isAdmin && <AdminTabs />}
             {readOnly && (
               <p className="flex items-center gap-2 border-t border-amarillo-400/60 bg-amarillo-50 px-4 py-2 text-sm font-semibold text-amarillo-900 sm:px-6">
                 <Eye className="size-4 shrink-0" aria-hidden />
@@ -156,6 +171,7 @@ export function AppShell() {
           </main>
         </div>
       </div>
+      {isAdmin && menuOpen && <MobileMenu onClose={() => setMenuOpen(false)} />}
     </div>
   );
 }
@@ -191,32 +207,81 @@ function AdminSidebar() {
   return (
     <div className="hidden w-64 shrink-0 bg-carbon-950 lg:block print:hidden">
       <aside className="sticky top-[3px] flex h-[calc(100dvh-3px)] flex-col text-carbon-300">
-        <div className="border-b border-white/10 px-5 pt-5 pb-5">
-          <AlcaldiaLogo tone="light" />
-          <p className="mt-4 text-xs font-semibold tracking-wider text-carbon-400 uppercase">Feria de Emprendimiento</p>
-        </div>
-        <nav aria-label="Módulos" className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
-          {ADMIN_NAV.map((group) => (
-            <div key={group.label}>
-              <p className="px-3 pb-1.5 text-[0.6875rem] font-semibold tracking-wider text-carbon-500 uppercase">{group.label}</p>
-              <ul className="space-y-0.5">
-                {group.items.map(({ to, label, icon: Icon, end }) => (
-                  <li key={to}>
-                    <NavLink
-                      to={to}
-                      end={end}
-                      className={({ isActive }) =>
-                        cn(
-                          'relative flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
-                          isActive ? 'bg-white/10 text-white' : 'hover:bg-white/5 hover:text-white',
-                        )
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
-                          {isActive && <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r bg-amarillo-300" />}
-                          <Icon className={cn('size-[1.125rem]', isActive ? 'text-white' : 'text-carbon-400')} aria-hidden />
-                          {label}
+        <SidebarContent />
+      </aside>
+    </div>
+  );
+}
+
+/** En el celular, el mismo menú lateral de escritorio, que se abre desde el botón de la barra superior. */
+function MobileMenu({ onClose }: { onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden print:hidden" role="dialog" aria-modal="true" aria-label="Menú de módulos">
+      <div className="absolute inset-0 bg-carbon-950/60" onClick={onClose} aria-hidden />
+      <aside className="relative flex h-full w-72 max-w-[85vw] flex-col bg-carbon-950 text-carbon-300 shadow-xl">
+        <BrandStripe className="h-[3px]" />
+        <button
+          ref={closeRef}
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-3 rounded-lg p-2 text-carbon-400 hover:bg-white/10 hover:text-white"
+          aria-label="Cerrar el menú"
+        >
+          <X className="size-5" aria-hidden />
+        </button>
+        <SidebarContent onNavigate={onClose} />
+      </aside>
+    </div>
+  );
+}
+
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <>
+      <div className="border-b border-white/10 px-5 pt-5 pb-5">
+        <AlcaldiaLogo tone="light" />
+        <p className="mt-4 text-xs font-semibold tracking-wider text-carbon-400 uppercase">Feria de Emprendimiento</p>
+      </div>
+      <nav aria-label="Módulos" className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
+        {ADMIN_NAV.map((group) => (
+          <div key={group.label}>
+            <p className="px-3 pb-1.5 text-[0.6875rem] font-semibold tracking-wider text-carbon-500 uppercase">{group.label}</p>
+            <ul className="space-y-0.5">
+              {group.items.map(({ to, label, icon: Icon, end }) => (
+                <li key={to}>
+                  <NavLink
+                    to={to}
+                    end={end}
+                    onClick={onNavigate}
+                    className={({ isActive }) =>
+                      cn(
+                        'relative flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors lg:h-10',
+                        isActive ? 'bg-white/10 text-white' : 'hover:bg-white/5 hover:text-white',
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {isActive && <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r bg-amarillo-300" />}
+                        <Icon className={cn('size-[1.125rem]', isActive ? 'text-white' : 'text-carbon-400')} aria-hidden />
+                        {label}
                         </>
                       )}
                     </NavLink>
@@ -231,30 +296,6 @@ function AdminSidebar() {
           <br />
           Uso exclusivo del personal autorizado
         </p>
-      </aside>
-    </div>
-  );
-}
-
-function AdminTabs() {
-  return (
-    <nav aria-label="Módulos" className="flex gap-1 overflow-x-auto border-t border-carbon-100 px-3 py-2 lg:hidden">
-      {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          className={({ isActive }) =>
-            cn(
-              'flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold',
-              isActive ? 'bg-carbon-900 text-white' : 'text-carbon-600 hover:bg-carbon-100',
-            )
-          }
-        >
-          <Icon className="size-4" aria-hidden />
-          {label}
-        </NavLink>
-      ))}
-    </nav>
+    </>
   );
 }

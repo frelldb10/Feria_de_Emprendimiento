@@ -216,6 +216,19 @@ create table if not exists public.activity (
 );
 create index if not exists activity_at_idx on public.activity (at desc);
 
+-- Historial: cada feria terminada se guarda como un resumen para compararla con las siguientes.
+create table if not exists public.fair_editions (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(btrim(name)) between 3 and 120),
+  -- Cifras de la feria: asistencia, capacitación, kits, bonos, ventas y caja menor.
+  summary jsonb not null,
+  -- Un registro por emprendedor con sus resultados; sin teléfonos ni cuentas bancarias.
+  entrepreneurs jsonb not null default '[]'::jsonb,
+  at timestamptz not null default now(),
+  operator_id uuid references auth.users (id) on delete set null,
+  operator_name text not null default ''
+);
+
 
 -- ---------------------------------------------------------------------
 -- Quién registró y cuándo: lo pone el servidor, no el celular.
@@ -237,7 +250,7 @@ declare
   t text;
 begin
   foreach t in array array['attendance', 'training_attendance', 'logistics_checks', 'kit_deliveries', 'bonuses', 'sales',
-                           'petty_cash_funds', 'petty_cash_expenses'] loop
+                           'petty_cash_funds', 'petty_cash_expenses', 'fair_editions'] loop
     execute format('drop trigger if exists stamp_operator on public.%I', t);
     execute format(
       'create trigger stamp_operator before insert or update on public.%I for each row execute function private.stamp_operator()',
@@ -350,6 +363,7 @@ alter table public.sales enable row level security;
 alter table public.petty_cash_funds enable row level security;
 alter table public.petty_cash_expenses enable row level security;
 alter table public.activity enable row level security;
+alter table public.fair_editions enable row level security;
 
 drop policy if exists "perfil propio o administrador" on public.profiles;
 create policy "perfil propio o administrador" on public.profiles
@@ -370,6 +384,11 @@ create policy "asistencia: leen todos los roles" on public.attendance
 drop policy if exists "asistencia: registra puerta" on public.attendance;
 create policy "asistencia: registra puerta" on public.attendance
   for insert to authenticated with check (private.has_role(array['admin', 'door']));
+
+-- Un ingreso mal registrado solo lo puede eliminar el administrador.
+drop policy if exists "asistencia: corrige el administrador" on public.attendance;
+create policy "asistencia: corrige el administrador" on public.attendance
+  for delete to authenticated using (private.has_role(array['admin']));
 
 drop policy if exists "capacitación: leen todos los roles" on public.training_info;
 create policy "capacitación: leen todos los roles" on public.training_info
@@ -457,6 +476,14 @@ drop policy if exists "gastos: elimina el administrador" on public.petty_cash_ex
 create policy "gastos: elimina el administrador" on public.petty_cash_expenses
   for delete to authenticated using (private.has_role(array['admin']));
 
+-- Historial: lo ven el administrador y el observador. Se guarda con archive_fair; solo el administrador lo borra.
+drop policy if exists "historial: leen administrador y observador" on public.fair_editions;
+create policy "historial: leen administrador y observador" on public.fair_editions
+  for select to authenticated using (private.has_role(array['admin', 'observer']));
+drop policy if exists "historial: elimina el administrador" on public.fair_editions;
+create policy "historial: elimina el administrador" on public.fair_editions
+  for delete to authenticated using (private.has_role(array['admin']));
+
 drop policy if exists "actividad: la ve el administrador" on public.activity;
 create policy "actividad: la ve el administrador" on public.activity
   for select to authenticated using (private.has_role(array['admin', 'observer']));
@@ -467,7 +494,7 @@ create policy "actividad: la escriben todos los roles" on public.activity
 -- El proyecto se creó sin exponer tablas automáticamente: los permisos van explícitos.
 revoke all on public.profiles, public.entrepreneurs, public.attendance, public.training_info,
   public.training_attendance, public.logistics_checks, public.kit_deliveries, public.bonuses,
-  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity from anon;
+  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity, public.fair_editions from anon;
 
 grant select on public.profiles to authenticated;
 grant select, insert, update, delete on public.entrepreneurs to authenticated;
@@ -476,11 +503,13 @@ grant select, update on public.training_info to authenticated;
 grant select, insert, update on public.logistics_checks, public.kit_deliveries, public.bonuses, public.sales to authenticated;
 grant select, insert, update on public.petty_cash_funds to authenticated;
 grant select, insert, delete on public.petty_cash_expenses to authenticated;
+grant delete on public.attendance to authenticated;
+grant select, delete on public.fair_editions to authenticated;
 
 -- La función admin-users usa la clave de servicio.
 grant all on public.profiles, public.entrepreneurs, public.attendance, public.training_info,
   public.training_attendance, public.logistics_checks, public.kit_deliveries, public.bonuses,
-  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity to service_role;
+  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity, public.fair_editions to service_role;
 
 
 -- ---------------------------------------------------------------------
@@ -590,14 +619,38 @@ begin
 end;
 $$;
 
+-- Guarda la feria en el historial y, si se pide, vacía los datos para empezar la siguiente.
+-- Todo pasa junto: si algo falla, no se guarda ni se borra nada.
+create or replace function public.archive_fair(p_name text, p_summary jsonb, p_entrepreneurs jsonb, p_clear boolean)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  saved uuid;
+begin
+  if not private.has_role(array['admin']) then
+    raise exception 'Solo el administrador puede guardar la feria en el historial.' using errcode = '42501';
+  end if;
+  insert into public.fair_editions (name, summary, entrepreneurs)
+  values (btrim(p_name), p_summary, coalesce(p_entrepreneurs, '[]'::jsonb))
+  returning id into saved;
+  if p_clear then
+    perform public.clear_fair_data();
+  end if;
+  return saved;
+end;
+$$;
+
 revoke execute on function public.register_attendance(uuid, integer, text) from public, anon;
 revoke execute on function public.register_training(uuid, text) from public, anon;
 revoke execute on function public.generate_missing_qr_codes() from public, anon;
 revoke execute on function public.clear_fair_data() from public, anon;
+revoke execute on function public.archive_fair(text, jsonb, jsonb, boolean) from public, anon;
 grant execute on function public.register_attendance(uuid, integer, text) to authenticated;
 grant execute on function public.register_training(uuid, text) to authenticated;
 grant execute on function public.generate_missing_qr_codes() to authenticated;
 grant execute on function public.clear_fair_data() to authenticated;
+grant execute on function public.archive_fair(text, jsonb, jsonb, boolean) to authenticated;
 
 
 -- ---------------------------------------------------------------------
@@ -627,7 +680,7 @@ declare
 begin
   foreach t in array array['profiles', 'entrepreneurs', 'attendance', 'training_info', 'training_attendance',
                            'logistics_checks', 'kit_deliveries', 'bonuses', 'sales', 'petty_cash_funds',
-                           'petty_cash_expenses', 'activity'] loop
+                           'petty_cash_expenses', 'activity', 'fair_editions'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

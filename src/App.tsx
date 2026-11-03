@@ -16,6 +16,7 @@ const TrainingPage = lazy(() => import('./modules/training/TrainingPage').then((
 const LogisticsPage = lazy(() => import('./modules/logistics/LogisticsPage').then((m) => ({ default: m.LogisticsPage })));
 const BonusesPage = lazy(() => import('./modules/bonuses/BonusesPage').then((m) => ({ default: m.BonusesPage })));
 const FinancePage = lazy(() => import('./modules/finance/FinancePage').then((m) => ({ default: m.FinancePage })));
+const HistoryPage = lazy(() => import('./modules/history/HistoryPage').then((m) => ({ default: m.HistoryPage })));
 const PettyCashPage = lazy(() => import('./modules/pettyCash/PettyCashPage').then((m) => ({ default: m.PettyCashPage })));
 
 function Page({ allow, children }: { allow: Role[]; children: ReactNode }) {
@@ -43,6 +44,7 @@ export function App() {
             <Route path="/admin" element={<Page allow={['admin', 'observer']}><AdminDashboardPage /></Page>} />
             <Route path="/admin/reportes" element={<Page allow={['admin', 'observer']}><ReportsPage /></Page>} />
             <Route path="/admin/usuarios" element={<Page allow={['admin', 'observer']}><UsersPage /></Page>} />
+            <Route path="/admin/historial" element={<Page allow={['admin', 'observer']}><HistoryPage /></Page>} />
             <Route path="/puerta" element={<Page allow={['admin', 'observer', 'door']}><DoorPage /></Page>} />
             <Route path="/capacitacion" element={<Page allow={['admin', 'observer', 'training']}><TrainingPage /></Page>} />
             <Route path="/logistica" element={<Page allow={['admin', 'observer', 'logistics']}><LogisticsPage /></Page>} />

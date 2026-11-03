@@ -9,10 +9,14 @@ import { DEMO_ENTREPRENEURS } from './seed';
 import { findByQrCode } from './selectors';
 import type {
   ActivityKind,
+  AttendanceRecord,
   BankAccount,
   Entrepreneur,
   EntrepreneurshipBonus,
+  EditionEntrepreneur,
+  EditionSummary,
   EventDay,
+  FairEdition,
   KitDelivery,
   KitItemId,
   LogisticsField,
@@ -47,6 +51,18 @@ function logActivity(kind: ActivityKind, message: string): void {
     .from('activity')
     .insert({ kind, message })
     .then(() => undefined, () => undefined);
+}
+
+/**
+ * Sin permiso, la base no da error al borrar: simplemente no borra nada. Pasa también si la base
+ * todavía no tiene el permiso nuevo (falta ejecutar schema.sql).
+ */
+function ensureDeleted(rows: unknown[] | null, what: string): void {
+  if (!rows?.length) {
+    throw new ActionError(
+      `No se pudo eliminar ${what}. Solo el administrador puede hacerlo; si eres administrador, falta actualizar la base de datos (supabase/schema.sql).`,
+    );
+  }
 }
 
 /* ---------- Lectura de QR (puerta y capacitación) ---------- */
@@ -121,6 +137,20 @@ export function registerAttendance(entrepreneurId: string, day: EventDay, method
 
 export function registerAttendanceByCode(code: string, day: EventDay): Promise<ScanResult> {
   return scanByCode(code, (id) => registerAttendance(id, day, 'qr'));
+}
+
+/** Corrige un ingreso mal registrado. Solo el administrador; la persona puede volver a ingresar con su QR. */
+export async function deleteAttendance(record: AttendanceRecord, businessName: string): Promise<void> {
+  // Sin el permiso nuevo en la base, PostgREST responde "permiso denegado": se trata como "no borró nada".
+  const deleted = await run(() => supabase.from('attendance').delete().eq('id', record.id).select('id')).catch(
+    (error: ActionError) => {
+      if (error.message === 'No tienes permiso para hacer esto.') return [];
+      throw error;
+    },
+  );
+  ensureDeleted(deleted, 'el ingreso');
+  logActivity('correction', `Se eliminó el ingreso del Día ${record.day} de ${businessName}`);
+  await refresh('attendance');
 }
 
 /* ---------- Capacitación ---------- */
@@ -292,34 +322,57 @@ export async function deletePettyCashExpense(expense: PettyCashExpense): Promise
 
 /* ---------- Administración ---------- */
 
+const entrepreneurColumns = (r: NewEntrepreneur) => ({
+  // Sin documento va null: dos textos vacíos chocarían con la restricción unique.
+  document: r.document || null,
+  owner_name: r.ownerName,
+  business_name: r.businessName,
+  phone: r.phone,
+  category: r.category,
+  section: r.section,
+  stand: r.stand,
+  needs_stand: r.needsStand,
+  needs_power: r.needsPower,
+  chairs: r.chairs,
+});
+
 /** Carga solo los documentos nuevos; los que ya existen se ignoran. Devuelve cuántos entraron. */
 export async function importEntrepreneurs(rows: NewEntrepreneur[]): Promise<number> {
   if (rows.length === 0) return 0;
   const inserted = await run(() =>
     supabase
       .from('entrepreneurs')
-      .upsert(
-        rows.map((r) => ({
-          // Sin documento va null: dos textos vacíos chocarían con la restricción unique.
-          document: r.document || null,
-          owner_name: r.ownerName,
-          business_name: r.businessName,
-          phone: r.phone,
-          category: r.category,
-          section: r.section,
-          stand: r.stand,
-          needs_stand: r.needsStand,
-          needs_power: r.needsPower,
-          chairs: r.chairs,
-        })),
-        { onConflict: 'document', ignoreDuplicates: true },
-      )
+      .upsert(rows.map(entrepreneurColumns), { onConflict: 'document', ignoreDuplicates: true })
       .select('id'),
   );
   const added = inserted?.length ?? 0;
   if (added > 0) logActivity('import', `Carga masiva: ${added} emprendedores nuevos`);
   await refresh('entrepreneurs');
   return added;
+}
+
+/**
+ * Agrega un emprendedor a mano, por ejemplo uno que llegó a la puerta sin estar inscrito, y le
+ * asigna su QR. La generación también le pone código a cualquier otro que todavía no lo tenga.
+ */
+export async function createEntrepreneur(data: NewEntrepreneur): Promise<Entrepreneur> {
+  const row = await run(() => supabase.from('entrepreneurs').insert(entrepreneurColumns(data)).select().single()).catch(
+    (error: ActionError) => {
+      throw error.message === 'Ese registro ya existe.' ? new ActionError('Ya hay un emprendedor con ese documento.') : error;
+    },
+  );
+  const generated = ((await run(() => supabase.rpc('generate_missing_qr_codes'))) as Record<string, unknown>[]).map(toEntrepreneur);
+  logActivity('import', `Emprendedor agregado a mano: ${data.businessName}`);
+  await refresh('entrepreneurs');
+  return generated.find((e) => e.id === row.id) ?? toEntrepreneur(row);
+}
+
+/** Borra al emprendedor y todo lo suyo: ingresos, capacitación, logística, kit, cuenta del bono y ventas. */
+export async function deleteEntrepreneur(entrepreneur: Entrepreneur): Promise<void> {
+  const deleted = await run(() => supabase.from('entrepreneurs').delete().eq('id', entrepreneur.id).select('id'));
+  ensureDeleted(deleted, 'al emprendedor');
+  logActivity('correction', `Se eliminó al emprendedor ${entrepreneur.businessName}`);
+  await refresh('entrepreneurs', 'attendance', 'trainingAttendance', 'logistics', 'kits', 'bonuses', 'sales');
 }
 
 export async function setEntrepreneurSection(entrepreneurId: string, section: SectionId | null): Promise<void> {
@@ -344,6 +397,47 @@ export async function loadDemoEntrepreneurs(): Promise<number> {
   const added = await importEntrepreneurs(DEMO_ENTREPRENEURS);
   await generateMissingQrCodes();
   return added;
+}
+
+/* ---------- Historial de ferias ---------- */
+
+/**
+ * Guarda la feria en el historial y, si clear es true, vacía los datos para empezar la siguiente.
+ * La base hace las dos cosas juntas: si algo falla, no se guarda ni se borra nada.
+ */
+export async function archiveFair(
+  name: string,
+  edition: { summary: EditionSummary; entrepreneurs: EditionEntrepreneur[] },
+  clear: boolean,
+): Promise<void> {
+  await run(() =>
+    supabase.rpc('archive_fair', { p_name: name, p_summary: edition.summary, p_entrepreneurs: edition.entrepreneurs, p_clear: clear }),
+  );
+  logActivity('archive', `Feria guardada en el historial: ${name}`);
+  if (clear) {
+    await refresh(
+      'entrepreneurs',
+      'attendance',
+      'trainingInfo',
+      'trainingAttendance',
+      'logistics',
+      'kits',
+      'bonuses',
+      'sales',
+      'pettyCash',
+      'activity',
+      'editions',
+    );
+  } else {
+    await refresh('editions', 'activity');
+  }
+}
+
+export async function deleteEdition(edition: FairEdition): Promise<void> {
+  const deleted = await run(() => supabase.from('fair_editions').delete().eq('id', edition.id).select('id'));
+  ensureDeleted(deleted, 'la feria del historial');
+  logActivity('archive', `Se eliminó del historial: ${edition.name}`);
+  await refresh('editions');
 }
 
 /** Borra los datos de la feria (no las cuentas de usuario ni las fotos ya subidas). */

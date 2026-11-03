@@ -1,4 +1,17 @@
-import { Ban, CircleCheck, GraduationCap, Landmark, PackageCheck, QrCode, ScanQrCode, Upload, Wallet, type LucideIcon } from 'lucide-react';
+import {
+  Archive,
+  Ban,
+  CircleCheck,
+  Eraser,
+  GraduationCap,
+  Landmark,
+  PackageCheck,
+  QrCode,
+  ScanQrCode,
+  Upload,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { cn } from '../../lib/cn';
@@ -16,6 +29,8 @@ const KIND_STYLE: Record<ActivityKind, { icon: LucideIcon; className: string }> 
   import: { icon: Upload, className: 'bg-carbon-100 text-carbon-700' },
   qr: { icon: QrCode, className: 'bg-carbon-100 text-carbon-700' },
   'petty-cash': { icon: Wallet, className: 'bg-amarillo-50 text-amarillo-700' },
+  correction: { icon: Eraser, className: 'bg-rojo-50 text-rojo-600' },
+  archive: { icon: Archive, className: 'bg-carbon-100 text-carbon-700' },
 };
 
 export function ActivityFeed() {
@@ -32,7 +47,8 @@ export function ActivityFeed() {
       ) : (
         <ol className="max-h-104 divide-y divide-carbon-100 overflow-y-auto">
           {activity.slice(0, 15).map((entry) => {
-            const { icon: Icon, className } = KIND_STYLE[entry.kind];
+            // Un tipo que esta versión no conoce (de una versión más nueva) se muestra como movimiento general.
+            const { icon: Icon, className } = KIND_STYLE[entry.kind] ?? KIND_STYLE.import;
             return (
               <li key={entry.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
                 <span className={cn('mt-0.5 rounded-md p-1.5', className)}>
