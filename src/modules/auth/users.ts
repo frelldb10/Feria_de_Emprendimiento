@@ -96,6 +96,18 @@ export const changeRole = (userId: string, role: Role) => callAdminUsers({ actio
 export const setUserActive = (userId: string, active: boolean) => callAdminUsers({ action: 'set_active', userId, active });
 export const resetPassword = (userId: string, password: string) => callAdminUsers({ action: 'reset_password', userId, password });
 
+export async function deleteUser(userId: string): Promise<void> {
+  try {
+    await callAdminUsers({ action: 'delete', userId });
+  } catch (error) {
+    // La función del servidor es de antes de esta opción: hay que volver a desplegarla.
+    if (error instanceof ActionError && error.message === 'Acción no reconocida.') {
+      throw new ActionError('Falta actualizar la función admin-users en Supabase (ver supabase/CONFIGURACION.md).');
+    }
+    throw error;
+  }
+}
+
 /* ---------- Validaciones del formulario (el servidor las repite) ---------- */
 
 /** "José.Muñoz" → "jose.munoz": sin tildes ni ñ, que no van en el usuario. */

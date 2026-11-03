@@ -1,6 +1,6 @@
 // Feria Astrea · función "admin-users" (Supabase Edge Function).
 //
-// Solo el administrador la puede usar. Crea cuentas, cambia roles, activa o desactiva
+// Solo el administrador la puede usar. Crea y elimina cuentas, cambia roles, activa o desactiva
 // y restablece contraseñas con la clave de servicio, que nunca sale del servidor.
 // Se despliega desde Supabase → Edge Functions (ver supabase/CONFIGURACION.md).
 
@@ -117,6 +117,19 @@ Deno.serve(async (req) => {
         const { error } = await admin.auth.admin.updateUserById(user.id, { ban_duration: active ? 'none' : FOREVER });
         if (error) throw new Refused(`No se pudo cambiar el estado: ${error.message}`);
         await admin.from('profiles').update({ active, updated_at: new Date().toISOString() }).eq('id', user.id);
+        return reply({ ok: true });
+      }
+
+      case 'delete': {
+        const user = await target(body.userId);
+        if (user.id === caller.id) throw new Refused('No puedes eliminar tu propia cuenta.');
+        if (user.role === 'admin' && user.active && (await activeAdmins()) <= 1) {
+          throw new Refused('Debe quedar al menos un administrador activo.');
+        }
+        // El perfil se borra solo (on delete cascade). Lo que la persona registró en la feria se
+        // conserva: esas tablas guardan su nombre y su id queda vacío.
+        const { error } = await admin.auth.admin.deleteUser(user.id);
+        if (error) throw new Refused(`No se pudo eliminar la cuenta: ${error.message}. Puedes desactivarla en su lugar.`);
         return reply({ ok: true });
       }
 

@@ -30,11 +30,11 @@ Cada vez que se sube un cambio a la rama `main` de GitHub, Vercel publica la ver
 
 ## Usuarios y roles
 
-Cada persona entra con usuario y contraseña. Las cuentas las crea el administrador en **Usuarios**: nombre, usuario, rol y contraseña inicial (hay un botón para generarla). Al crearla, la pantalla muestra los datos para entregárselos a la persona. Desde ahí el administrador cambia roles, desactiva o reactiva cuentas y restablece contraseñas; los operadores no pueden cambiar la suya.
+Cada persona entra con usuario y contraseña. Las cuentas las crea el administrador en **Usuarios**: nombre, usuario, rol y contraseña inicial (hay un botón para generarla). Al crearla, la pantalla muestra los datos para entregárselos a la persona. Desde ahí el administrador cambia roles, desactiva o reactiva cuentas, restablece contraseñas y elimina cuentas; los operadores no pueden cambiar la suya. Eliminar una cuenta no borra lo que esa persona registró en la feria: queda con su nombre.
 
 Por dentro, cada usuario es una cuenta de Supabase Auth con el correo `usuario@feria-astrea.local` (no se envían correos). Crear cuentas y cambiar contraseñas lo hace la función `admin-users` del servidor, que es la única que usa la clave de servicio.
 
-Reglas: el administrador no puede cambiar su propio rol ni desactivarse, y siempre debe quedar al menos un administrador activo. Si el administrador cambia el rol de alguien o desactiva su cuenta, la sesión abierta de esa persona se entera al instante.
+Reglas: el administrador no puede cambiar su propio rol, desactivarse ni eliminar su propia cuenta, y siempre debe quedar al menos un administrador activo. Si el administrador cambia el rol de alguien o desactiva su cuenta, la sesión abierta de esa persona se entera al instante.
 
 | Rol | Qué hace |
 | --- | --- |

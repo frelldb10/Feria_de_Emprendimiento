@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { KeyRound, Power, UserPlus } from 'lucide-react';
+import { KeyRound, Power, Trash2, UserPlus } from 'lucide-react';
 import { LoadingScreen } from '../../../components/layout/LoadingScreen';
 import { PageHeader } from '../../../components/layout/PageHeader';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { Chips } from '../../../components/ui/Chips';
+import { Modal } from '../../../components/ui/Modal';
 import { StatusAlert } from '../../../components/ui/StatusAlert';
 import { cn } from '../../../lib/cn';
 import { formatDateTime } from '../../../lib/format';
@@ -13,7 +14,7 @@ import { describeError } from '../../../lib/supabase';
 import { useAuth } from '../../auth/AuthContext';
 import { useCanEdit } from '../../auth/useCanEdit';
 import { ROLE_ORDER, ROLES, type Role } from '../../auth/roles';
-import { changeRole, setUserActive, useUserList, type AppUser } from '../../auth/users';
+import { changeRole, deleteUser, setUserActive, useUserList, type AppUser } from '../../auth/users';
 import { NewUserModal } from './NewUserModal';
 import { ResetPasswordModal } from './ResetPasswordModal';
 
@@ -28,6 +29,9 @@ export function UsersPage() {
   const [filter, setFilter] = useState<RoleFilter>('all');
   const [creating, setCreating] = useState(false);
   const [resetting, setResetting] = useState<AppUser | null>(null);
+  const [removing, setRemoving] = useState<AppUser | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeFailure, setRemoveFailure] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -50,6 +54,27 @@ export function UsersPage() {
       setProblem(describeError(failure));
     } finally {
       setWorking(null);
+    }
+  }
+
+  function closeRemove() {
+    if (removeBusy) return;
+    setRemoving(null);
+    setRemoveFailure(null);
+  }
+
+  /** La lista se actualiza sola por tiempo real cuando el servidor borra la cuenta. */
+  async function confirmRemove() {
+    if (!removing) return;
+    setRemoveBusy(true);
+    setRemoveFailure(null);
+    try {
+      await deleteUser(removing.id);
+      setRemoving(null);
+    } catch (failure) {
+      setRemoveFailure(describeError(failure));
+    } finally {
+      setRemoveBusy(false);
     }
   }
 
@@ -92,7 +117,7 @@ export function UsersPage() {
 
       <Card title={`${visible.length} ${visible.length === 1 ? 'usuario' : 'usuarios'}`} flush>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-3xl text-left text-sm">
+          <table className="w-full min-w-4xl text-left text-sm">
             <thead className="bg-carbon-50 text-xs tracking-wide text-carbon-600 uppercase">
               <tr>
                 <th className="px-4 py-2.5 font-semibold sm:pl-5">Persona</th>
@@ -122,7 +147,7 @@ export function UsersPage() {
                         onChange={(e) => void run(u.id, () => changeRole(u.id, e.target.value as Role))}
                         aria-label={`Rol de ${u.name}`}
                         className={cn(
-                          'h-10 w-full max-w-56 rounded-md border bg-white px-2 text-sm focus:border-verde-700 focus:outline-none disabled:bg-carbon-50 disabled:text-carbon-500',
+                          'h-10 w-full min-w-52 max-w-56 rounded-md border bg-white px-2 text-sm focus:border-verde-700 focus:outline-none disabled:bg-carbon-50 disabled:text-carbon-500',
                           u.role ? 'border-carbon-300' : 'border-amarillo-500 text-amarillo-900',
                         )}
                       >
@@ -153,6 +178,11 @@ export function UsersPage() {
                             {busy ? 'Guardando…' : u.active ? 'Desactivar' : 'Activar'}
                           </Button>
                         )}
+                        {canEdit && !isMe && (
+                          <Button variant="dangerGhost" icon={Trash2} disabled={busy} onClick={() => setRemoving(u)}>
+                            Eliminar
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -165,6 +195,33 @@ export function UsersPage() {
 
       <NewUserModal open={creating} onClose={() => setCreating(false)} existing={users} />
       <ResetPasswordModal user={resetting} onClose={() => setResetting(null)} />
+      <Modal
+        open={removing !== null}
+        onClose={closeRemove}
+        title="Eliminar cuenta"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeRemove} disabled={removeBusy}>
+              Cancelar
+            </Button>
+            <Button variant="danger" icon={Trash2} onClick={() => void confirmRemove()} disabled={removeBusy}>
+              {removeBusy ? 'Eliminando…' : 'Eliminar'}
+            </Button>
+          </>
+        }
+      >
+        {removing && (
+          <div className="space-y-3">
+            {removeFailure && <StatusAlert tone="danger" title={removeFailure} />}
+            <p className="text-carbon-700">
+              Se elimina la cuenta de <span className="font-semibold text-carbon-900">{removing.name}</span> (
+              <span className="font-mono text-sm">{removing.username}</span>) y ya no podrá entrar. Lo que registró en la feria se conserva con
+              su nombre. No se puede deshacer.
+            </p>
+            <p className="text-sm text-carbon-500">Si solo quieres que no entre por un tiempo, usa Desactivar.</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
