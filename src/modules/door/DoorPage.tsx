@@ -63,14 +63,6 @@ export function DoorPage() {
     void run(() => registerAttendanceByCode(normalized, day));
   }
 
-  /** Simula que la cámara lee el QR de alguien que aún no ha entrado ese día. */
-  function simulateScan() {
-    const pending = withQr.filter((e) => !attendanceIndex.get(e.id)?.[day]);
-    const pool = pending.length > 0 ? pending : withQr;
-    const picked = pool[Math.floor(Math.random() * pool.length)];
-    if (picked?.qrCode) handleCode(picked.qrCode);
-  }
-
   function handleManual(entrepreneur: Entrepreneur) {
     void run(() => registerAttendance(entrepreneur.id, day, 'manual'));
   }
@@ -101,7 +93,7 @@ export function DoorPage() {
                 Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
               </p>
             ) : (
-              <ScannerPanel onCode={handleCode} onSimulate={simulateScan} lastCode={lastCode} busy={busy} />
+              <ScannerPanel onCode={handleCode} lastCode={lastCode} busy={busy} showingResult={result !== null} />
             )}
           </Card>
 

@@ -37,13 +37,6 @@ export function TrainingPage() {
     void run(() => registerTrainingByCode(normalized));
   }
 
-  function simulateScan() {
-    const pending = withQr.filter((e) => !attended.has(e.id));
-    const pool = pending.length > 0 ? pending : withQr;
-    const picked = pool[Math.floor(Math.random() * pool.length)];
-    if (picked?.qrCode) handleCode(picked.qrCode);
-  }
-
   function handleManual(entrepreneur: Entrepreneur) {
     void run(() => registerTraining(entrepreneur.id, 'manual'));
   }
@@ -77,7 +70,7 @@ export function TrainingPage() {
                 Aún no hay códigos QR generados. El administrador debe hacer la generación masiva desde el panel.
               </p>
             ) : (
-              <ScannerPanel onCode={handleCode} onSimulate={simulateScan} lastCode={lastCode} busy={busy} />
+              <ScannerPanel onCode={handleCode} lastCode={lastCode} busy={busy} showingResult={result !== null} />
             )}
           </Card>
 

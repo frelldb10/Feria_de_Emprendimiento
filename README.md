@@ -72,7 +72,7 @@ src/
     ui/          Botón, tarjeta, modal, alertas, pestañas, filtros, campos, foto
     brand/       Logos y la franja verde, roja y amarilla
     layout/      Barra superior, menú lateral del administrador, menú de cuenta, carga
-    scan/        Lector QR, pantalla verde o roja y últimos registros (puerta y capacitación)
+    scan/        Lector QR con la cámara, pantalla verde o roja y últimos registros (puerta y capacitación)
     shared/      Buscador de emprendedores y ficha resumen
   modules/
     auth/        Ingreso, sesión, cuentas y protección de rutas
@@ -108,6 +108,7 @@ Antes de cargar se muestra una vista previa que marca las filas con errores y lo
 
 ## Reglas de la feria
 
+- **Lectura del QR:** con la cámara del celular, en Puerta y Capacitación. La primera vez se toca "Encender cámara" y se da el permiso; después se enciende sola al entrar. Un QR que se queda frente a la cámara no se registra dos veces. Hay botón de linterna y de cambiar de cámara cuando el celular los tiene. La cámara solo funciona desde una dirección `https://` (la de Vercel, o `localhost` en el computador). El campo "Código del QR" sirve con lectores QR de mano (USB o Bluetooth).
 - **Puerta:** un mismo QR solo entra una vez por día. El segundo intento muestra la pantalla roja con la hora y quién registró el primero.
 - **Capacitación:** una sola sesión; el administrador define nombre, fecha y lugar. Cada emprendedor queda registrado una vez.
 - **Bono de emprendimiento:** solo para quien participó en la feria (Día 1, Día 2 o ambos). Se registra entidad, tipo de cuenta, número (escrito dos veces y sin poder pegarlo), titular (nombre y apellido, solo letras), documento del titular y la autorización de datos (Ley 1581 de 2012). Nequi y Daviplata piden el celular. El pago se hace por transferencia después de la feria con el Excel.
@@ -131,4 +132,3 @@ El administrador los descarga desde Reportes; el operador de capacitación, el d
 ## Pendiente
 
 - **Sin internet no se registra nada.** La app avisa con una franja roja, pero no guarda en cola para enviar después. Si en el lugar del evento la señal es mala, conviene un router o datos móviles dedicados.
-- **Cámara real para el QR.** Publicada en Vercel la app ya tiene HTTPS, que los celulares exigen para usar la cámara; falta conectar la cámara al lector. El campo "Código del QR" ya funciona con lectores QR de mano (USB o Bluetooth).

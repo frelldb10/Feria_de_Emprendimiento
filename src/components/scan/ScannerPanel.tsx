@@ -1,20 +1,22 @@
 import { useState, type FormEvent } from 'react';
-import { Keyboard, Repeat, ScanLine } from 'lucide-react';
+import { Keyboard, Repeat } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { CameraScanner } from './CameraScanner';
 
 interface ScannerPanelProps {
   onCode: (code: string) => void;
-  onSimulate: () => void;
   lastCode: string | null;
   /** Mientras el servidor responde no se aceptan más lecturas. */
   busy?: boolean;
+  /** true mientras se muestra la pantalla verde o roja: la cámara no envía lecturas. */
+  showingResult?: boolean;
 }
 
 /**
- * Cámara simulada. El campo de texto también sirve con lectores QR de mano (USB o Bluetooth),
- * que "escriben" el código y presionan Enter.
+ * Cámara del celular para leer el QR. El campo de texto sirve con lectores QR de mano
+ * (USB o Bluetooth), que "escriben" el código y presionan Enter.
  */
-export function ScannerPanel({ onCode, onSimulate, lastCode, busy = false }: ScannerPanelProps) {
+export function ScannerPanel({ onCode, lastCode, busy = false, showingResult = false }: ScannerPanelProps) {
   const [code, setCode] = useState('');
 
   function handleSubmit(event: FormEvent) {
@@ -26,34 +28,18 @@ export function ScannerPanel({ onCode, onSimulate, lastCode, busy = false }: Sca
 
   return (
     <div className="space-y-4">
-      <div className="relative mx-auto aspect-square w-full max-w-72 overflow-hidden rounded-2xl bg-carbon-950">
-        <div aria-hidden className="absolute inset-8">
-          <span className="absolute top-0 left-0 size-10 rounded-tl-lg border-t-4 border-l-4 border-white" />
-          <span className="absolute top-0 right-0 size-10 rounded-tr-lg border-t-4 border-r-4 border-white" />
-          <span className="absolute bottom-0 left-0 size-10 rounded-bl-lg border-b-4 border-l-4 border-white" />
-          <span className="absolute right-0 bottom-0 size-10 rounded-br-lg border-r-4 border-b-4 border-white" />
-          <span className="absolute inset-x-2 top-1/2 h-0.5 animate-scanline bg-verde-500 shadow-[0_0_12px_2px] shadow-verde-500/60 motion-reduce:animate-none" />
-        </div>
-        <p className="absolute inset-x-0 bottom-3 text-center text-xs font-medium text-carbon-300">
-          Cámara simulada · apunta al código QR
-        </p>
-      </div>
+      <CameraScanner onCode={onCode} paused={busy || showingResult} />
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Button size="lg" icon={ScanLine} onClick={onSimulate} disabled={busy} fullWidth>
-          {busy ? 'Registrando…' : 'Simular lectura'}
-        </Button>
-        <Button
-          size="lg"
-          variant="secondary"
-          icon={Repeat}
-          onClick={() => lastCode && onCode(lastCode)}
-          disabled={!lastCode || busy}
-          fullWidth
-        >
-          Leer el último otra vez
-        </Button>
-      </div>
+      <Button
+        size="lg"
+        variant="secondary"
+        icon={Repeat}
+        onClick={() => lastCode && onCode(lastCode)}
+        disabled={!lastCode || busy}
+        fullWidth
+      >
+        Leer el último otra vez
+      </Button>
 
       <form onSubmit={handleSubmit} className="flex gap-2">
         <div className="relative flex-1">
