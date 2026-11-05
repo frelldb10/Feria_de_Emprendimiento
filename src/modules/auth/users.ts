@@ -63,7 +63,11 @@ export function useUserList() {
       .channel('perfiles')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => void reload())
       .subscribe();
+    // El aviso de una cuenta borrada puede no llegar por tiempo real: se vuelve a leer al volver a la ventana.
+    const onFocus = () => void reload();
+    window.addEventListener('focus', onFocus);
     return () => {
+      window.removeEventListener('focus', onFocus);
       void supabase.removeChannel(channel);
     };
   }, [reload]);

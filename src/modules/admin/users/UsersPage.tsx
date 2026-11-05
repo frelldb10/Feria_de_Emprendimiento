@@ -25,7 +25,7 @@ const roleOrder = (role: Role | null) => (role ? ROLE_ORDER.indexOf(role) : -1);
 export function UsersPage() {
   const { user: me } = useAuth();
   const canEdit = useCanEdit();
-  const { users, error, loading } = useUserList();
+  const { users, error, loading, reload } = useUserList();
   const [filter, setFilter] = useState<RoleFilter>('all');
   const [creating, setCreating] = useState(false);
   const [resetting, setResetting] = useState<AppUser | null>(null);
@@ -44,12 +44,16 @@ export function UsersPage() {
   );
   const withoutRole = users.filter((u) => u.role === null).length;
 
-  /** Aplica un cambio en el servidor; la lista se actualiza sola por tiempo real. */
+  /**
+   * Aplica un cambio en el servidor y vuelve a leer la lista. No se espera solo al tiempo real:
+   * el aviso de una cuenta borrada puede no llegar y la persona seguiría apareciendo.
+   */
   async function run(userId: string, action: () => Promise<void>) {
     setWorking(userId);
     setProblem(null);
     try {
       await action();
+      await reload();
     } catch (failure) {
       setProblem(describeError(failure));
     } finally {
@@ -63,13 +67,13 @@ export function UsersPage() {
     setRemoveFailure(null);
   }
 
-  /** La lista se actualiza sola por tiempo real cuando el servidor borra la cuenta. */
   async function confirmRemove() {
     if (!removing) return;
     setRemoveBusy(true);
     setRemoveFailure(null);
     try {
       await deleteUser(removing.id);
+      await reload();
       setRemoving(null);
     } catch (failure) {
       setRemoveFailure(describeError(failure));
