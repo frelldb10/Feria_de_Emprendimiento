@@ -243,18 +243,16 @@ create table if not exists public.visitors (
 );
 -- Una cédula se registra una sola vez por día.
 create unique index if not exists visitors_document_date_idx on public.visitors (document, visit_date);
--- Encuesta turística (teléfono, grupo, cómo se enteró y, para quien viene de otro municipio, motivo,
--- noches, hospedaje y transporte). Los registros anteriores quedan con teléfono vacío y lo demás en null.
+-- Encuesta (teléfono, tamaño del grupo y cómo se enteró). Los registros anteriores quedan con el
+-- teléfono vacío y lo demás en null.
 alter table public.visitors add column if not exists phone text not null default ''
   check (phone ~ '^([0-9]{10})?$');
 alter table public.visitors add column if not exists group_size smallint check (group_size between 1 and 5);
 alter table public.visitors add column if not exists heard_from text
   check (heard_from in ('redes', 'radio', 'conocidos', 'de_paso', 'otro'));
-alter table public.visitors add column if not exists trip_purpose text
-  check (trip_purpose in ('feria', 'familia', 'trabajo', 'transito', 'otro'));
-alter table public.visitors add column if not exists nights smallint check (nights between 0 and 3);
-alter table public.visitors add column if not exists lodging text check (lodging in ('hotel', 'familia', 'otro'));
-alter table public.visitors add column if not exists transport text check (transport in ('moto', 'carro', 'bus', 'otro'));
+-- Las preguntas del viaje (motivo, noches, hospedaje y transporte) se quitaron de la encuesta.
+alter table public.visitors drop column if exists trip_purpose, drop column if exists nights,
+  drop column if exists lodging, drop column if exists transport;
 
 -- Ajustes de la app (una sola fila). visitors_open abre o cierra el formulario público de visitantes.
 create table if not exists public.app_settings (
@@ -710,11 +708,10 @@ $$;
 -- Registro de un visitante desde el QR, sin cuenta. La base revisa los datos aunque alguien se salte
 -- el formulario. Si la cédula ya se registró hoy devuelve "duplicate" y no guarda nada.
 drop function if exists public.register_visitor(text, text, text, text, boolean);
+drop function if exists public.register_visitor(text, text, text, text, boolean, text, integer, text, text, integer, text, text);
 create or replace function public.register_visitor(
   p_full_name text, p_document text, p_origin text, p_origin_detail text, p_consent boolean,
-  p_phone text default null, p_group_size integer default null, p_heard_from text default null,
-  p_trip_purpose text default null, p_nights integer default null, p_lodging text default null,
-  p_transport text default null
+  p_phone text default null, p_group_size integer default null, p_heard_from text default null
 )
 returns jsonb
 language plpgsql security definer set search_path = ''
@@ -724,7 +721,6 @@ declare
   v_document text := regexp_replace(coalesce(p_document, ''), '\D', '', 'g');
   v_phone text := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
   v_detail text := left(btrim(regexp_replace(coalesce(p_origin_detail, ''), '\s+', ' ', 'g')), 120);
-  v_outside boolean := coalesce(p_origin in ('cesar', 'otro_departamento'), false);
   saved_id uuid;
 begin
   if not public.visitor_registration_open() then
@@ -751,36 +747,11 @@ begin
   if p_heard_from is null or p_heard_from not in ('redes', 'radio', 'conocidos', 'de_paso', 'otro') then
     raise exception 'Elige cómo te enteraste de la feria.' using errcode = 'P0001';
   end if;
-  if v_outside then
-    if p_trip_purpose is null or p_trip_purpose not in ('feria', 'familia', 'trabajo', 'transito', 'otro') then
-      raise exception 'Elige el motivo de tu viaje.' using errcode = 'P0001';
-    end if;
-    if p_nights is null or p_nights not between 0 and 3 then
-      raise exception 'Dinos si pasas la noche en Astrea.' using errcode = 'P0001';
-    end if;
-    if p_nights > 0 and (p_lodging is null or p_lodging not in ('hotel', 'familia', 'otro')) then
-      raise exception 'Elige dónde te hospedas.' using errcode = 'P0001';
-    end if;
-    if p_transport is null or p_transport not in ('moto', 'carro', 'bus', 'otro') then
-      raise exception 'Elige en qué viajaste.' using errcode = 'P0001';
-    end if;
-  end if;
   if p_consent is not true then
     raise exception 'Para registrarte debes autorizar el tratamiento de tus datos.' using errcode = 'P0001';
   end if;
-  -- Quien vive en Astrea no responde las preguntas del viaje: se guardan vacías.
-  insert into public.visitors (
-    full_name, document, phone, origin, origin_detail, group_size, heard_from,
-    trip_purpose, nights, lodging, transport, data_consent, visit_date
-  )
-  values (
-    v_name, v_document, v_phone, p_origin, v_detail, p_group_size, p_heard_from,
-    case when v_outside then p_trip_purpose end,
-    case when v_outside then p_nights end,
-    case when v_outside and p_nights > 0 then p_lodging end,
-    case when v_outside then p_transport end,
-    true, (now() at time zone 'America/Bogota')::date
-  )
+  insert into public.visitors (full_name, document, phone, origin, origin_detail, group_size, heard_from, data_consent, visit_date)
+  values (v_name, v_document, v_phone, p_origin, v_detail, p_group_size, p_heard_from, true, (now() at time zone 'America/Bogota')::date)
   on conflict do nothing
   returning id into saved_id;
   return jsonb_build_object('status', case when saved_id is null then 'duplicate' else 'ok' end);
@@ -788,9 +759,9 @@ end;
 $$;
 
 revoke execute on function public.visitor_registration_open() from public;
-revoke execute on function public.register_visitor(text, text, text, text, boolean, text, integer, text, text, integer, text, text) from public;
+revoke execute on function public.register_visitor(text, text, text, text, boolean, text, integer, text) from public;
 grant execute on function public.visitor_registration_open() to anon, authenticated;
-grant execute on function public.register_visitor(text, text, text, text, boolean, text, integer, text, text, integer, text, text) to anon, authenticated;
+grant execute on function public.register_visitor(text, text, text, text, boolean, text, integer, text) to anon, authenticated;
 
 revoke execute on function public.register_attendance(uuid, integer, text) from public, anon;
 revoke execute on function public.register_training(uuid, text) from public, anon;

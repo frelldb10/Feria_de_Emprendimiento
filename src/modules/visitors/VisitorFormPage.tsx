@@ -10,19 +10,8 @@ import { cn } from '../../lib/cn';
 import { describeError } from '../../lib/supabase';
 import { isFullName, onlyDigits, onlyLetters } from '../../lib/text';
 import { isVisitorRegistrationOpen, registerVisitor } from '../../store/actions';
-import {
-  GROUP_SIZES,
-  HEARD_FROM,
-  isColombianPhone,
-  isFromOutside,
-  LODGING,
-  NIGHTS,
-  TRANSPORT,
-  TRIP_PURPOSES,
-  VISITOR_ORIGINS,
-  type Option,
-} from '../../store/visitors';
-import type { HeardFrom, Lodging, Transport, TripPurpose, VisitorOrigin } from '../../store/types';
+import { GROUP_SIZES, HEARD_FROM, isColombianPhone, VISITOR_ORIGINS, type Option } from '../../store/visitors';
+import type { HeardFrom, VisitorOrigin } from '../../store/types';
 
 type Phase = 'loading' | 'closed' | 'unavailable' | 'form' | 'done' | 'repeated';
 
@@ -32,10 +21,6 @@ interface Form {
   phone: string;
   origin: VisitorOrigin | '';
   originDetail: string;
-  tripPurpose: TripPurpose | null;
-  nights: number | null;
-  lodging: Lodging | null;
-  transport: Transport | null;
   groupSize: number | null;
   heardFrom: HeardFrom | null;
   consent: boolean;
@@ -49,10 +34,6 @@ const EMPTY: Form = {
   phone: '',
   origin: '',
   originDetail: '',
-  tripPurpose: null,
-  nights: null,
-  lodging: null,
-  transport: null,
   groupSize: null,
   heardFrom: null,
   consent: false,
@@ -66,12 +47,6 @@ function validate(form: Form): Errors {
   const origin = VISITOR_ORIGINS.find((o) => o.id === form.origin);
   if (!origin) errors.origin = 'Elige de dónde nos visitas.';
   else if (origin.detailRequired && form.originDetail.trim().length < 2) errors.originDetail = `Escribe ${origin.detailLabel.toLowerCase()}.`;
-  if (isFromOutside(form.origin)) {
-    if (form.tripPurpose === null) errors.tripPurpose = 'Elige el motivo de tu viaje.';
-    if (form.nights === null) errors.nights = 'Dinos si pasas la noche en Astrea.';
-    else if (form.nights > 0 && form.lodging === null) errors.lodging = 'Elige dónde te hospedas.';
-    if (form.transport === null) errors.transport = 'Elige en qué viajaste.';
-  }
   if (form.groupSize === null) errors.groupSize = 'Elige con cuántas personas vienes.';
   if (form.heardFrom === null) errors.heardFrom = 'Elige cómo te enteraste de la feria.';
   if (!form.consent) errors.consent = 'Para registrarte debes autorizar el tratamiento de tus datos.';
@@ -162,7 +137,6 @@ export function VisitorFormPage() {
       return;
     }
     if (!form.origin || busy) return;
-    const outside = isFromOutside(form.origin);
     setBusy(true);
     setFailure(null);
     try {
@@ -174,11 +148,6 @@ export function VisitorFormPage() {
         originDetail: form.originDetail.trim(),
         groupSize: form.groupSize,
         heardFrom: form.heardFrom,
-        // Las preguntas del viaje solo aplican a quien viene de otro municipio.
-        tripPurpose: outside ? form.tripPurpose : null,
-        nights: outside ? form.nights : null,
-        lodging: outside && form.nights !== null && form.nights > 0 ? form.lodging : null,
-        transport: outside ? form.transport : null,
         consent: form.consent,
       });
       setRegisteredName(form.fullName.trim().split(/\s+/)[0]);
@@ -202,7 +171,6 @@ export function VisitorFormPage() {
   }
 
   const origin = VISITOR_ORIGINS.find((o) => o.id === form.origin);
-  const outside = isFromOutside(form.origin);
 
   return (
     <div className="min-h-dvh bg-carbon-50">
@@ -306,46 +274,6 @@ export function VisitorFormPage() {
                   hint={origin.detailRequired ? undefined : 'Opcional'}
                   error={errors.originDetail}
                 />
-              )}
-
-              {outside && (
-                <div className="space-y-5 rounded-lg border border-carbon-200 bg-carbon-50 p-4">
-                  <p className="text-sm font-semibold text-carbon-800">Sobre tu viaje a Astrea</p>
-                  <ChoiceGroup
-                    name="tripPurpose"
-                    legend="¿Cuál es el motivo principal de tu viaje?"
-                    options={TRIP_PURPOSES}
-                    value={form.tripPurpose}
-                    onChange={(value) => update('tripPurpose', value)}
-                    error={errors.tripPurpose}
-                  />
-                  <ChoiceGroup
-                    name="nights"
-                    legend="¿Pasas la noche en Astrea?"
-                    options={NIGHTS}
-                    value={form.nights}
-                    onChange={(value) => update('nights', value)}
-                    error={errors.nights}
-                  />
-                  {form.nights !== null && form.nights > 0 && (
-                    <ChoiceGroup
-                      name="lodging"
-                      legend="¿Dónde te hospedas?"
-                      options={LODGING}
-                      value={form.lodging}
-                      onChange={(value) => update('lodging', value)}
-                      error={errors.lodging}
-                    />
-                  )}
-                  <ChoiceGroup
-                    name="transport"
-                    legend="¿En qué viajaste?"
-                    options={TRANSPORT}
-                    value={form.transport}
-                    onChange={(value) => update('transport', value)}
-                    error={errors.transport}
-                  />
-                </div>
               )}
 
               <ChoiceGroup

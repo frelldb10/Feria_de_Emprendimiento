@@ -2,7 +2,7 @@ import { formatForExport, normalizeText, plural } from '../../lib/format';
 import type { CellValue, SheetSpec } from '../../lib/xlsx';
 import { pettyCashDay, totalsByCategory } from '../../store/pettyCash';
 import { sectionLabel } from '../../store/sections';
-import { tourismStats, visitorStats } from '../../store/visitors';
+import { visitorStats } from '../../store/visitors';
 import { computeMetrics, indexAttendance, indexKits, isKitComplete } from '../../store/selectors';
 import { EVENT_DAYS, type EditionEntrepreneur, type EditionSummary, type FairEdition, type FairState } from '../../store/types';
 import { buildBalance, salesByEntrepreneur } from '../finance/balance';
@@ -39,12 +39,7 @@ export function buildEdition(state: FairState): { summary: EditionSummary; entre
         .filter((c) => c.count > 0)
         .map((c) => ({ label: c.label, total: c.total })),
     },
-    visitors: {
-      total: state.visitors.list.length,
-      outsideAstrea: visitorStats(state.visitors.list).outsideAstrea,
-      tourists: tourismStats(state.visitors.list).tourists,
-      excursionists: tourismStats(state.visitors.list).excursionists,
-    },
+    visitors: { total: state.visitors.list.length, outsideAstrea: visitorStats(state.visitors.list).outsideAstrea },
   };
 
   const entrepreneurs = state.entrepreneurs.map((e): EditionEntrepreneur => {
@@ -128,8 +123,6 @@ export const COMPARISON_ROWS: ComparisonRow[] = [
   { label: 'Visitantes', value: () => null, group: true },
   { label: 'Visitantes registrados', value: (c) => c.summary.visitors?.total ?? null },
   { label: 'Visitantes de fuera de Astrea', value: (c) => c.summary.visitors?.outsideAstrea ?? null },
-  { label: 'Turistas (pasan la noche en Astrea)', value: (c) => c.summary.visitors?.tourists ?? null },
-  { label: 'Excursionistas (visita del día)', value: (c) => c.summary.visitors?.excursionists ?? null },
   { label: 'Caja menor', value: () => null, group: true },
   { label: 'Dinero asignado', value: (c) => c.summary.pettyCash.assigned, money: true },
   { label: 'Dinero gastado', value: (c) => c.summary.pettyCash.spent, money: true },

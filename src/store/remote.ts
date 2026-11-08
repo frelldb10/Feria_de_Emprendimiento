@@ -133,10 +133,6 @@ const toVisitor = (r: Row): Visitor => ({
   phone: r.phone ?? '',
   groupSize: r.group_size ?? null,
   heardFrom: r.heard_from ?? null,
-  tripPurpose: r.trip_purpose ?? null,
-  nights: r.nights ?? null,
-  lodging: r.lodging ?? null,
-  transport: r.transport ?? null,
 });
 
 const toEdition = (r: Row): FairEdition => ({

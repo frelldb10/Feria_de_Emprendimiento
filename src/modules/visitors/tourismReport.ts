@@ -58,40 +58,24 @@ export function buildTourismSheets(state: FairState): SheetSpec[] {
   rows.push(['Público local: vive en Astrea', t.locals, pct(t.locals, t.total)]);
   rows.push(['Visitantes: vienen de otro municipio', t.visitors, pct(t.visitors, t.total)]);
 
-  group('2. Visitantes según pernoctación (porcentaje sobre los visitantes de otros municipios)');
-  rows.push(['Turistas: pasan al menos una noche en Astrea', t.tourists, pct(t.tourists, t.visitors)]);
-  rows.push(['Excursionistas: llegan y regresan el mismo día', t.excursionists, pct(t.excursionists, t.visitors)]);
-  if (t.visitorsWithoutNights > 0) rows.push(['Sin dato (registrados antes de la encuesta)', t.visitorsWithoutNights, pct(t.visitorsWithoutNights, t.visitors)]);
-
-  group('3. Procedencia por mercado (porcentaje sobre el total de registros)');
+  group('2. Procedencia por mercado (porcentaje sobre el total de registros)');
   for (const o of VISITOR_ORIGINS) {
     const count = list.filter((v) => v.origin === o.id).length;
     rows.push([`Mercado ${MARKET[o.id].toLowerCase()}: ${o.label}`, count, pct(count, t.total)]);
   }
 
-  group('4. Pernoctación y hospedaje de los turistas');
-  rows.push(['Pernoctaciones (noches que suman los turistas)', t.nights, '']);
-  rows.push(['Estancia media (noches por turista)', { value: t.averageStay, decimal: true }, '']);
-  tallyRows(t.byLodging, 'Hospedaje: ');
-
-  group('5. Motivo principal del viaje (visitantes de otros municipios)');
-  tallyRows(t.byPurpose);
-
-  group('6. Medio de transporte (visitantes de otros municipios)');
-  tallyRows(t.byTransport);
-
-  group('7. Grupo de viaje (todos los registros con respuesta)');
+  group('3. Grupo de viaje (registros con respuesta)');
   rows.push(['Tamaño promedio del grupo (personas)', { value: t.averageGroup, decimal: true }, '']);
   tallyRows(t.byGroup);
 
-  group('8. Cómo se enteraron de la feria');
+  group('4. Cómo se enteraron de la feria (registros con respuesta)');
   tallyRows(t.byHeard);
 
-  group('9. Afluencia');
+  group('5. Afluencia');
   rows.push([`Día con más registros: ${busiestDay ? formatDateOnly(busiestDay.date) : 'sin registros'}`, busiestDay?.count ?? 0, pct(busiestDay?.count ?? 0, t.total)]);
   rows.push([`Hora con más registros: ${busiestHour ? hourRange(busiestHour[0]) : 'sin registros'}`, busiestHour?.[1] ?? 0, pct(busiestHour?.[1] ?? 0, t.total)]);
 
-  group('10. Movimiento económico de la feria');
+  group('6. Movimiento económico de la feria');
   rows.push(['Ventas reportadas por los emprendedores', { value: sales.total, money: true }, '']);
   rows.push(['Emprendedores que reportaron ventas', sales.reporters, '']);
   rows.push(['Ventas por visitante registrado (referencia)', { value: t.total > 0 ? Math.round(sales.total / t.total) : 0, money: true }, '']);
@@ -108,9 +92,9 @@ export function buildTourismSheets(state: FairState): SheetSpec[] {
     notes,
     highlights: [
       { label: 'Visitantes registrados', value: t.total, tone: 'neutral' },
-      { label: 'Turistas', value: t.tourists },
-      { label: 'Excursionistas', value: t.excursionists, tone: 'amarillo' },
-      { label: 'Estancia media (noches)', value: t.averageStay, decimal: true, tone: 'neutral' },
+      { label: 'Público local', value: t.locals, tone: 'neutral' },
+      { label: 'Visitantes de otros municipios', value: t.visitors },
+      { label: 'Personas por grupo (promedio)', value: t.averageGroup, decimal: true, tone: 'amarillo' },
     ],
     columns: [
       { header: 'Indicador', width: 56 },
@@ -182,14 +166,10 @@ export function buildTourismSheets(state: FairState): SheetSpec[] {
     ],
     rows: [
       ['Visitante', 'Persona que viaja a un lugar distinto de su entorno habitual, por menos de un año y por cualquier motivo principal que no sea trabajar para una entidad del lugar visitado.'],
-      ['Turista', 'Visitante que pasa al menos una noche en el lugar visitado (visitante que pernocta).'],
-      ['Excursionista', 'Visitante que llega y regresa el mismo día, sin pasar la noche (visitante del día).'],
       ['Entorno habitual', 'Zona donde una persona hace su vida cotidiana. En este informe es el municipio donde vive.'],
       ['Público local', 'Personas que viven en Astrea, en el casco urbano o en la zona rural. Están en su entorno habitual: son público de la feria, pero no visitantes en sentido turístico.'],
+      ['Turistas y excursionistas', 'La OMT divide a los visitantes en turistas (pasan al menos una noche) y excursionistas (regresan el mismo día). El registro de la feria no pregunta por la noche, así que este informe los cuenta juntos como visitantes.'],
       ['Mercado', 'Local: Astrea. Regional: otros municipios del Cesar. Nacional: otros departamentos.'],
-      ['Pernoctación', 'Cada noche que un turista pasa en Astrea. La opción "3 noches o más" se cuenta como 3, así que el total es un mínimo.'],
-      ['Estancia media', 'Pernoctaciones divididas entre el número de turistas.'],
-      ['Motivo principal del viaje', 'La razón sin la cual el viaje no se habría hecho.'],
       ['Grupo de viaje', 'Personas que llegan juntas, contando a quien se registra. Si varias personas del mismo grupo se registran, el grupo aparece más de una vez.'],
       ['Ventas por visitante', 'Ventas reportadas por los emprendedores divididas entre los visitantes registrados. Es una referencia: no todo el público se registra.'],
       ['Fuente de los datos', 'Registro voluntario con el QR de la entrada. Cada persona se registra una vez por día con su cédula. No es una muestra estadística: las cifras describen a quienes se registraron.'],

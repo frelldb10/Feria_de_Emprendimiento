@@ -1,5 +1,5 @@
 import { normalizeText } from '../lib/format';
-import type { HeardFrom, Lodging, Transport, TripPurpose, Visitor, VisitorOrigin } from './types';
+import type { HeardFrom, Visitor, VisitorOrigin } from './types';
 
 // Las listas deben coincidir con las restricciones de visitors en schema.sql.
 export const VISITOR_ORIGINS: { id: VisitorOrigin; label: string; detailLabel: string; detailRequired: boolean }[] = [
@@ -27,34 +27,6 @@ export const HEARD_FROM: Option<HeardFrom>[] = [
   { id: 'radio', label: 'Radio o perifoneo' },
   { id: 'conocidos', label: 'Familiares o amigos' },
   { id: 'de_paso', label: 'Pasaba por aquí' },
-  { id: 'otro', label: 'Otro medio' },
-];
-
-export const TRIP_PURPOSES: Option<TripPurpose>[] = [
-  { id: 'feria', label: 'Vine a la feria' },
-  { id: 'familia', label: 'Visitar familiares o amigos' },
-  { id: 'trabajo', label: 'Trabajo o negocios' },
-  { id: 'transito', label: 'Voy de paso' },
-  { id: 'otro', label: 'Otro motivo' },
-];
-
-export const NIGHTS: Option<number>[] = [
-  { id: 0, label: 'No, regreso hoy' },
-  { id: 1, label: '1 noche' },
-  { id: 2, label: '2 noches' },
-  { id: 3, label: '3 noches o más' },
-];
-
-export const LODGING: Option<Lodging>[] = [
-  { id: 'hotel', label: 'Hotel o residencias' },
-  { id: 'familia', label: 'Casa de familiares o amigos' },
-  { id: 'otro', label: 'Otro lugar' },
-];
-
-export const TRANSPORT: Option<Transport>[] = [
-  { id: 'moto', label: 'Moto' },
-  { id: 'carro', label: 'Carro particular' },
-  { id: 'bus', label: 'Bus o transporte intermunicipal' },
   { id: 'otro', label: 'Otro medio' },
 ];
 
@@ -140,24 +112,16 @@ export interface TourismStats {
   total: number;
   /** Residentes de Astrea (casco urbano y zona rural). */
   locals: number;
-  /** Vienen de otro municipio. */
+  /** Vienen de otro municipio: visitantes en el sentido de las estadísticas de turismo. */
   visitors: number;
-  /** Visitantes que pasan al menos una noche en Astrea. */
-  tourists: number;
-  /** Visitantes que regresan el mismo día. */
-  excursionists: number;
-  /** Visitantes registrados antes de la encuesta, sin dato de noches. */
-  visitorsWithoutNights: number;
-  /** Noches que suman los turistas ("3 o más" cuenta como 3). */
-  nights: number;
-  /** Noches promedio por turista. */
-  averageStay: number;
-  /** Personas promedio por grupo de viaje, entre quienes respondieron. */
+  /** Otros municipios del Cesar. */
+  regional: number;
+  /** Otros departamentos. */
+  national: number;
+  /** Personas promedio por grupo, entre quienes respondieron. */
   averageGroup: number;
+  /** Registros con las respuestas de la encuesta (los anteriores no las tienen). */
   answeredSurvey: number;
-  byPurpose: Tally[];
-  byLodging: Tally[];
-  byTransport: Tally[];
   byGroup: Tally[];
   byHeard: Tally[];
 }
@@ -168,25 +132,17 @@ function tally<T>(options: Option<T>[], values: Array<T | null>): Tally[] {
 
 /** Cifras de turismo con la clasificación de las Recomendaciones Internacionales (RIET 2008). */
 export function tourismStats(list: Visitor[]): TourismStats {
-  const outside = list.filter((v) => isFromOutside(v.origin));
-  const tourists = outside.filter((v) => v.nights !== null && v.nights > 0);
-  const excursionists = outside.filter((v) => v.nights === 0);
-  const nights = tourists.reduce((sum, v) => sum + (v.nights ?? 0), 0);
+  const regional = list.filter((v) => v.origin === 'cesar').length;
+  const national = list.filter((v) => v.origin === 'otro_departamento').length;
   const groups = list.filter((v) => v.groupSize !== null);
   return {
     total: list.length,
-    locals: list.length - outside.length,
-    visitors: outside.length,
-    tourists: tourists.length,
-    excursionists: excursionists.length,
-    visitorsWithoutNights: outside.length - tourists.length - excursionists.length,
-    nights,
-    averageStay: tourists.length > 0 ? nights / tourists.length : 0,
+    locals: list.length - regional - national,
+    visitors: regional + national,
+    regional,
+    national,
     averageGroup: groups.length > 0 ? groups.reduce((sum, v) => sum + (v.groupSize ?? 0), 0) / groups.length : 0,
     answeredSurvey: list.filter((v) => v.heardFrom !== null).length,
-    byPurpose: tally(TRIP_PURPOSES, outside.map((v) => v.tripPurpose)),
-    byLodging: tally(LODGING, tourists.map((v) => v.lodging)),
-    byTransport: tally(TRANSPORT, outside.map((v) => v.transport)),
     byGroup: tally(GROUP_SIZES, list.map((v) => v.groupSize)),
     byHeard: tally(HEARD_FROM, list.map((v) => v.heardFrom)),
   };

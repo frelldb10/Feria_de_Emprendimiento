@@ -159,9 +159,6 @@ export type ActivityKind =
 
 export type VisitorOrigin = 'astrea_urbano' | 'astrea_rural' | 'cesar' | 'otro_departamento';
 export type HeardFrom = 'redes' | 'radio' | 'conocidos' | 'de_paso' | 'otro';
-export type TripPurpose = 'feria' | 'familia' | 'trabajo' | 'transito' | 'otro';
-export type Lodging = 'hotel' | 'familia' | 'otro';
-export type Transport = 'moto' | 'carro' | 'bus' | 'otro';
 
 /** Preguntas de la encuesta para las estadísticas de turismo. */
 export interface VisitorSurvey {
@@ -169,12 +166,6 @@ export interface VisitorSurvey {
   /** Personas del grupo de viaje, contándose a sí mismo; 5 quiere decir "5 o más". */
   groupSize: number | null;
   heardFrom: HeardFrom | null;
-  /** Lo que sigue solo se pregunta a quien viene de otro municipio. */
-  tripPurpose: TripPurpose | null;
-  /** Noches en Astrea: 0 es visita del día; 3 quiere decir "3 o más". */
-  nights: number | null;
-  lodging: Lodging | null;
-  transport: Transport | null;
 }
 
 /**
@@ -215,11 +206,8 @@ export interface EditionSummary {
   sales: { day1: number; day2: number; total: number; reporters: number };
   bySection: { label: string; entrepreneurs: number; sales: number }[];
   pettyCash: { assigned: number; spent: number; byCategory: { label: string; total: number }[] };
-  /**
-   * No está en las ferias guardadas antes del módulo de visitantes; turistas y excursionistas
-   * tampoco, en las guardadas antes de la encuesta turística.
-   */
-  visitors?: { total: number; outsideAstrea: number; tourists?: number; excursionists?: number };
+  /** No está en las ferias guardadas antes del módulo de visitantes. */
+  visitors?: { total: number; outsideAstrea: number };
 }
 
 /** Resultado de un emprendedor en una feria guardada. No lleva teléfono ni cuenta bancaria. */

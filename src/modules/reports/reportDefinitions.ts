@@ -331,7 +331,7 @@ export const REPORTS: ReportDefinition[] = [
     id: 'turismo',
     group: 'publico',
     title: 'Informe turístico de la feria',
-    description: 'Cómo se comportó la feria según las estadísticas de turismo: turistas, excursionistas, noches, motivo del viaje, transporte y afluencia.',
+    description: 'Cómo se comportó la feria según las estadísticas de turismo: público local y visitantes, procedencia por mercado, grupos, cómo se enteraron y afluencia.',
     icon: Luggage,
     contents: ['Resumen turístico', 'Procedencia', 'Afluencia por hora', 'Metodología'],
     count: (state) => state.visitors.list.length,

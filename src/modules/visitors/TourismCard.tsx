@@ -52,22 +52,17 @@ export function TourismCard({ stats }: { stats: TourismStats }) {
   return (
     <Card
       title="Perfil turístico"
-      description="Clasificación de la OMT: quien vive en Astrea es público local; quien viene de otro municipio es turista si pasa la noche y excursionista si regresa el mismo día."
+      description="Clasificación de la OMT: quien vive en Astrea es público local; quien viene de otro municipio es visitante."
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Figure label="Público local" value={stats.locals} detail={`${share(stats.locals, stats.total)} de los registros`} tone="carbon" />
-        <Figure label="De otros municipios" value={stats.visitors} detail={`${share(stats.visitors, stats.total)} de los registros`} tone="carbon" />
-        <Figure
-          label="Turistas"
-          value={stats.tourists}
-          detail={stats.tourists > 0 ? `${decimal.format(stats.averageStay)} noches en promedio` : 'Pasan al menos una noche'}
-          tone="verde"
-        />
-        <Figure label="Excursionistas" value={stats.excursionists} detail="Regresan el mismo día" tone="amarillo" />
+        <Figure label="Visitantes" value={stats.visitors} detail={`${share(stats.visitors, stats.total)} vienen de otro municipio`} tone="verde" />
+        <Figure label="Mercado regional" value={stats.regional} detail="Otros municipios del Cesar" tone="amarillo" />
+        <Figure label="Mercado nacional" value={stats.national} detail="Otros departamentos" tone="amarillo" />
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Bars title="Motivo principal del viaje" items={stats.byPurpose} empty="Todavía no hay visitantes de otros municipios con esta respuesta." />
         <Bars title="Cómo se enteraron de la feria" items={stats.byHeard} empty="Todavía no hay respuestas." />
+        <Bars title="Personas por grupo" items={stats.byGroup} empty="Todavía no hay respuestas." />
       </div>
       {stats.averageGroup > 0 && (
         <p className="mt-5 border-t border-carbon-100 pt-4 text-sm text-carbon-600">

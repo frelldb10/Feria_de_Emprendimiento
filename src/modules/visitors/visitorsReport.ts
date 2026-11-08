@@ -1,7 +1,7 @@
 import { formatDateOnly, formatForExport } from '../../lib/format';
 import type { SheetSpec } from '../../lib/xlsx';
 import type { FairState } from '../../store/types';
-import { GROUP_SIZES, HEARD_FROM, isFromOutside, LODGING, NIGHTS, optionLabel, originLabel, TRANSPORT, TRIP_PURPOSES, visitorStats } from '../../store/visitors';
+import { GROUP_SIZES, HEARD_FROM, optionLabel, originLabel, visitorStats } from '../../store/visitors';
 
 /** Libro de Excel: resumen por procedencia, cada visitante, lugares más frecuentes y registros por día. */
 export function buildVisitorSheets(state: FairState): SheetSpec[] {
@@ -41,7 +41,6 @@ export function buildVisitorSheets(state: FairState): SheetSpec[] {
     {
       name: 'Visitantes',
       title: 'Cada persona que registró su visita',
-      notes: ['Las preguntas del viaje (motivo, noches, hospedaje y transporte) solo las responde quien viene de otro municipio.'],
       columns: [
         { header: 'N°', width: 6, center: true },
         { header: 'Fecha y hora', width: 17 },
@@ -52,29 +51,18 @@ export function buildVisitorSheets(state: FairState): SheetSpec[] {
         { header: 'Barrio, vereda o municipio', width: 26 },
         { header: 'Grupo', width: 11, center: true },
         { header: 'Cómo se enteró', width: 20 },
-        { header: 'Motivo del viaje', width: 24 },
-        { header: 'Noches', width: 14, center: true },
-        { header: 'Hospedaje', width: 24 },
-        { header: 'Transporte', width: 22 },
       ],
-      rows: list.map((v, i) => {
-        const outside = isFromOutside(v.origin);
-        return [
-          i + 1,
-          formatForExport(v.at),
-          v.fullName,
-          v.document,
-          v.phone,
-          originLabel(v.origin),
-          v.originDetail,
-          optionLabel(GROUP_SIZES, v.groupSize),
-          optionLabel(HEARD_FROM, v.heardFrom),
-          outside ? optionLabel(TRIP_PURPOSES, v.tripPurpose) : '',
-          outside ? optionLabel(NIGHTS, v.nights) : '',
-          outside ? optionLabel(LODGING, v.lodging) : '',
-          outside ? optionLabel(TRANSPORT, v.transport) : '',
-        ];
-      }),
+      rows: list.map((v, i) => [
+        i + 1,
+        formatForExport(v.at),
+        v.fullName,
+        v.document,
+        v.phone,
+        originLabel(v.origin),
+        v.originDetail,
+        optionLabel(GROUP_SIZES, v.groupSize),
+        optionLabel(HEARD_FROM, v.heardFrom),
+      ]),
       emptyText: 'Todavía no hay visitantes registrados.',
     },
     {
