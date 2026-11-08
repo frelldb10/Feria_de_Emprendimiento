@@ -229,6 +229,28 @@ create table if not exists public.fair_editions (
   operator_name text not null default ''
 );
 
+-- Visitantes: el público se registra escaneando un QR, sin cuenta. Solo entra por register_visitor.
+create table if not exists public.visitors (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null check (char_length(full_name) between 5 and 120),
+  document text not null check (document ~ '^[0-9]{5,12}$'),
+  origin text not null check (origin in ('astrea_urbano', 'astrea_rural', 'cesar', 'otro_departamento')),
+  -- Barrio, vereda, municipio o departamento, según la procedencia.
+  origin_detail text not null default '' check (char_length(origin_detail) <= 120),
+  data_consent boolean not null check (data_consent),
+  at timestamptz not null default now(),
+  visit_date date not null default ((now() at time zone 'America/Bogota')::date)
+);
+-- Una cédula se registra una sola vez por día.
+create unique index if not exists visitors_document_date_idx on public.visitors (document, visit_date);
+
+-- Ajustes de la app (una sola fila). visitors_open abre o cierra el formulario público de visitantes.
+create table if not exists public.app_settings (
+  id smallint primary key default 1 check (id = 1),
+  visitors_open boolean not null default true
+);
+insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+
 
 -- ---------------------------------------------------------------------
 -- Quién registró y cuándo: lo pone el servidor, no el celular.
@@ -364,6 +386,8 @@ alter table public.petty_cash_funds enable row level security;
 alter table public.petty_cash_expenses enable row level security;
 alter table public.activity enable row level security;
 alter table public.fair_editions enable row level security;
+alter table public.visitors enable row level security;
+alter table public.app_settings enable row level security;
 
 drop policy if exists "perfil propio o administrador" on public.profiles;
 create policy "perfil propio o administrador" on public.profiles
@@ -484,6 +508,23 @@ drop policy if exists "historial: elimina el administrador" on public.fair_editi
 create policy "historial: elimina el administrador" on public.fair_editions
   for delete to authenticated using (private.has_role(array['admin']));
 
+-- Visitantes: los ven el administrador y el observador; solo el administrador borra un registro.
+-- El público no puede leer la tabla: solo registrarse con register_visitor.
+drop policy if exists "visitantes: leen administrador y observador" on public.visitors;
+create policy "visitantes: leen administrador y observador" on public.visitors
+  for select to authenticated using (private.has_role(array['admin', 'observer']));
+drop policy if exists "visitantes: elimina el administrador" on public.visitors;
+create policy "visitantes: elimina el administrador" on public.visitors
+  for delete to authenticated using (private.has_role(array['admin']));
+
+drop policy if exists "ajustes: leen administrador y observador" on public.app_settings;
+create policy "ajustes: leen administrador y observador" on public.app_settings
+  for select to authenticated using (private.has_role(array['admin', 'observer']));
+drop policy if exists "ajustes: cambia el administrador" on public.app_settings;
+create policy "ajustes: cambia el administrador" on public.app_settings
+  for update to authenticated
+  using (private.has_role(array['admin'])) with check (private.has_role(array['admin']));
+
 drop policy if exists "actividad: la ve el administrador" on public.activity;
 create policy "actividad: la ve el administrador" on public.activity
   for select to authenticated using (private.has_role(array['admin', 'observer']));
@@ -494,7 +535,8 @@ create policy "actividad: la escriben todos los roles" on public.activity
 -- El proyecto se creó sin exponer tablas automáticamente: los permisos van explícitos.
 revoke all on public.profiles, public.entrepreneurs, public.attendance, public.training_info,
   public.training_attendance, public.logistics_checks, public.kit_deliveries, public.bonuses,
-  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity, public.fair_editions from anon;
+  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity, public.fair_editions,
+  public.visitors, public.app_settings from anon;
 
 grant select on public.profiles to authenticated;
 grant select, insert, update, delete on public.entrepreneurs to authenticated;
@@ -505,11 +547,14 @@ grant select, insert, update on public.petty_cash_funds to authenticated;
 grant select, insert, delete on public.petty_cash_expenses to authenticated;
 grant delete on public.attendance to authenticated;
 grant select, delete on public.fair_editions to authenticated;
+grant select, delete on public.visitors to authenticated;
+grant select, update on public.app_settings to authenticated;
 
 -- La función admin-users usa la clave de servicio.
 grant all on public.profiles, public.entrepreneurs, public.attendance, public.training_info,
   public.training_attendance, public.logistics_checks, public.kit_deliveries, public.bonuses,
-  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity, public.fair_editions to service_role;
+  public.sales, public.petty_cash_funds, public.petty_cash_expenses, public.activity, public.fair_editions,
+  public.visitors, public.app_settings to service_role;
 
 
 -- ---------------------------------------------------------------------
@@ -613,8 +658,9 @@ begin
   if not private.has_role(array['admin']) then
     raise exception 'Solo el administrador puede vaciar los datos.' using errcode = '42501';
   end if;
-  truncate public.activity, public.petty_cash_expenses, public.petty_cash_funds, public.sales, public.bonuses,
-    public.kit_deliveries, public.logistics_checks, public.training_attendance, public.attendance, public.entrepreneurs;
+  truncate public.activity, public.visitors, public.petty_cash_expenses, public.petty_cash_funds, public.sales,
+    public.bonuses, public.kit_deliveries, public.logistics_checks, public.training_attendance, public.attendance,
+    public.entrepreneurs;
   update public.training_info set title = 'Capacitación de emprendedores', date = null, place = '' where id = 1;
 end;
 $$;
@@ -640,6 +686,59 @@ begin
   return saved;
 end;
 $$;
+
+-- ¿El formulario público de visitantes está abierto? Lo puede preguntar cualquiera.
+create or replace function public.visitor_registration_open()
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select coalesce((select s.visitors_open from public.app_settings s where s.id = 1), true);
+$$;
+
+-- Registro de un visitante desde el QR, sin cuenta. La base revisa los datos aunque alguien se salte
+-- el formulario. Si la cédula ya se registró hoy devuelve "duplicate" y no guarda nada.
+create or replace function public.register_visitor(
+  p_full_name text, p_document text, p_origin text, p_origin_detail text, p_consent boolean
+)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_name text := btrim(regexp_replace(coalesce(p_full_name, ''), '\s+', ' ', 'g'));
+  v_document text := regexp_replace(coalesce(p_document, ''), '\D', '', 'g');
+  v_detail text := left(btrim(regexp_replace(coalesce(p_origin_detail, ''), '\s+', ' ', 'g')), 120);
+  saved_id uuid;
+begin
+  if not public.visitor_registration_open() then
+    raise exception 'El registro de visitantes está cerrado.' using errcode = 'P0001';
+  end if;
+  if char_length(v_name) not between 5 and 120 or v_name !~ '\S+ \S+' or v_name ~ '[0-9]' then
+    raise exception 'Escribe tu nombre y apellido, solo con letras.' using errcode = 'P0001';
+  end if;
+  if v_document !~ '^[0-9]{5,12}$' then
+    raise exception 'La cédula debe tener entre 5 y 12 dígitos.' using errcode = 'P0001';
+  end if;
+  if p_origin is null or p_origin not in ('astrea_urbano', 'astrea_rural', 'cesar', 'otro_departamento') then
+    raise exception 'Elige de dónde nos visitas.' using errcode = 'P0001';
+  end if;
+  if p_origin <> 'astrea_urbano' and char_length(v_detail) < 2 then
+    raise exception 'Escribe la vereda, el municipio o el departamento.' using errcode = 'P0001';
+  end if;
+  if p_consent is not true then
+    raise exception 'Para registrarte debes autorizar el tratamiento de tus datos.' using errcode = 'P0001';
+  end if;
+  insert into public.visitors (full_name, document, origin, origin_detail, data_consent, visit_date)
+  values (v_name, v_document, p_origin, v_detail, true, (now() at time zone 'America/Bogota')::date)
+  on conflict do nothing
+  returning id into saved_id;
+  return jsonb_build_object('status', case when saved_id is null then 'duplicate' else 'ok' end);
+end;
+$$;
+
+revoke execute on function public.visitor_registration_open() from public;
+revoke execute on function public.register_visitor(text, text, text, text, boolean) from public;
+grant execute on function public.visitor_registration_open() to anon, authenticated;
+grant execute on function public.register_visitor(text, text, text, text, boolean) to anon, authenticated;
 
 revoke execute on function public.register_attendance(uuid, integer, text) from public, anon;
 revoke execute on function public.register_training(uuid, text) from public, anon;
@@ -680,7 +779,7 @@ declare
 begin
   foreach t in array array['profiles', 'entrepreneurs', 'attendance', 'training_info', 'training_attendance',
                            'logistics_checks', 'kit_deliveries', 'bonuses', 'sales', 'petty_cash_funds',
-                           'petty_cash_expenses', 'activity', 'fair_editions'] loop
+                           'petty_cash_expenses', 'activity', 'fair_editions', 'visitors', 'app_settings'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

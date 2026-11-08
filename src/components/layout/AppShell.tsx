@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Truck,
   UserCog,
+  UserRoundCheck,
   Wallet,
   WifiOff,
   X,
@@ -67,6 +68,7 @@ const ADMIN_NAV: { label: string; items: NavItem[] }[] = [
       { to: '/capacitacion', label: 'Capacitación', icon: GraduationCap },
       { to: '/logistica', label: 'Logística', icon: Truck },
       { to: '/bonos', label: 'Bonos', icon: Landmark },
+      { to: '/admin/visitantes', label: 'Visitantes', icon: UserRoundCheck },
     ],
   },
   {

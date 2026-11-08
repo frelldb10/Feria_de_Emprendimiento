@@ -9,8 +9,9 @@ import { downloadReport, type ReportId } from './reportDefinitions';
 type Props = Pick<ButtonProps, 'variant' | 'disabled' | 'fullWidth'> & { children?: string };
 
 export function ReportDownloadButton({ report, children = 'Descargar Excel', variant = 'secondary', ...props }: Props & { report: ReportId }) {
+  const { operator } = useAuth();
   return (
-    <AsyncButton variant={variant} icon={Download} onRun={() => downloadReport(report, getState())} {...props}>
+    <AsyncButton variant={variant} icon={Download} onRun={() => downloadReport(report, getState(), operator)} {...props}>
       {children}
     </AsyncButton>
   );

@@ -27,6 +27,8 @@ import type {
   SaleCut,
   SectionId,
   TrainingInfo,
+  NewVisitor,
+  Visitor,
 } from './types';
 
 /*
@@ -399,6 +401,44 @@ export async function loadDemoEntrepreneurs(): Promise<number> {
   return added;
 }
 
+/* ---------- Visitantes ---------- */
+
+/** Formulario público del QR: no necesita cuenta. Devuelve "duplicate" si la cédula ya se registró hoy. */
+export async function registerVisitor(visitor: NewVisitor): Promise<'ok' | 'duplicate'> {
+  const reply = (await run(() =>
+    supabase.rpc('register_visitor', {
+      p_full_name: visitor.fullName,
+      p_document: visitor.document,
+      p_origin: visitor.origin,
+      p_origin_detail: visitor.originDetail,
+      p_consent: visitor.consent,
+    }),
+  )) as { status: 'ok' | 'duplicate' };
+  return reply.status;
+}
+
+export async function isVisitorRegistrationOpen(): Promise<boolean> {
+  return (await run(() => supabase.rpc('visitor_registration_open'))) !== false;
+}
+
+/** Abre o cierra el formulario público. Cerrado, el QR muestra que el registro terminó. */
+export async function setVisitorRegistrationOpen(open: boolean): Promise<void> {
+  const updated = await run(() => supabase.from('app_settings').update({ visitors_open: open }).eq('id', 1).select('id'));
+  if (!updated?.length) {
+    throw new ActionError('No se pudo cambiar. Solo el administrador puede hacerlo; si eres administrador, falta actualizar la base de datos (supabase/schema.sql).');
+  }
+  logActivity('visitor', open ? 'Se abrió el registro de visitantes' : 'Se cerró el registro de visitantes');
+  await refresh('visitors');
+}
+
+/** Para registros de prueba o mal hechos. */
+export async function deleteVisitor(visitor: Visitor): Promise<void> {
+  const deleted = await run(() => supabase.from('visitors').delete().eq('id', visitor.id).select('id'));
+  ensureDeleted(deleted, 'el registro del visitante');
+  logActivity('correction', `Se eliminó el registro de visitante de ${visitor.fullName}`);
+  await refresh('visitors');
+}
+
 /* ---------- Historial de ferias ---------- */
 
 /**
@@ -425,6 +465,7 @@ export async function archiveFair(
       'bonuses',
       'sales',
       'pettyCash',
+      'visitors',
       'activity',
       'editions',
     );
@@ -453,6 +494,7 @@ export async function clearAllData(): Promise<void> {
     'bonuses',
     'sales',
     'pettyCash',
+    'visitors',
     'activity',
   );
 }

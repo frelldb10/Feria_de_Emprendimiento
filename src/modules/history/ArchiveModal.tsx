@@ -108,7 +108,7 @@ export function ArchiveModal({ open, onClose }: { open: boolean; onClose: () => 
             checked={clear}
             onChange={setClear}
             label="Vaciar los datos para empezar la nueva feria"
-            description="Borra emprendedores, asistencias, capacitación, kits, bonos, ventas y caja menor. Las cuentas de usuario y el historial se mantienen."
+            description="Borra emprendedores, asistencias, capacitación, kits, bonos, ventas, caja menor y visitantes. Las cuentas de usuario y el historial se mantienen."
           />
           {clear && (
             <StatusAlert tone="warning" title="Los datos de la feria actual se borran en todos los equipos">

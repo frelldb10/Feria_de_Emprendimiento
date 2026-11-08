@@ -1,4 +1,4 @@
-import { formatForExport } from '../../lib/format';
+import { plural } from '../../lib/format';
 import type { SheetSpec } from '../../lib/xlsx';
 import { SECTIONS, sectionLabel } from '../../store/sections';
 import { EVENT_DAYS, SALE_CUTS, type Entrepreneur, type EventDay, type FairState, type SaleCut, type SectionId } from '../../store/types';
@@ -101,35 +101,46 @@ const average = (s: SectionBalance) => (s.reporters > 0 ? Math.round(s.total / s
 export function buildSalesSheets(state: FairState): SheetSpec[] {
   const summaryRows: Array<Array<string | number>> = [];
   const boldRows: number[] = [];
-  const periods: Array<[DayFilter, string]> = [[1, 'Día 1'], [2, 'Día 2'], ['all', 'Ambos días']];
+  const groupRows: number[] = [];
+  const periods: Array<[DayFilter, string]> = [[1, 'Día 1'], [2, 'Día 2'], ['all', 'Total de la feria (ambos días)']];
   for (const [filter, label] of periods) {
     const { sections, overall } = buildBalance(state, filter);
     const row = (name: string, s: SectionBalance) => [
-      label,
       name,
       ...SALE_CUTS.map((cut) => s.cuts[cut]),
       s.total,
       `${s.reporters} de ${s.members}`,
       average(s),
     ];
+    groupRows.push(summaryRows.length);
+    summaryRows.push([label]);
     for (const s of sections) summaryRows.push(row(s.label, s));
     boldRows.push(summaryRows.length);
-    summaryRows.push(row('Total', overall));
+    summaryRows.push(row(`Total ${filter === 'all' ? 'feria' : label}`, overall));
   }
 
+  const whole = buildBalance(state, 'all').overall;
   const summary: SheetSpec = {
     name: 'Resumen',
-    preface: ['Balance de ventas por sección', `Generado: ${formatForExport(new Date().toISOString())}`],
+    title: 'Balance de ventas por sección',
+    notes: ['Cada día tiene dos cortes. "Reportaron" cuenta a los emprendedores que registraron al menos un valor.'],
+    highlights: [
+      { label: 'Ventas totales', value: whole.total, money: true },
+      { label: 'Día 1', value: buildBalance(state, 1).overall.total, money: true, tone: 'amarillo' },
+      { label: 'Día 2', value: buildBalance(state, 2).overall.total, money: true, tone: 'amarillo' },
+      { label: 'Promedio por emprendedor', value: average(whole), money: true, tone: 'neutral' },
+    ],
+    // Ancho de hoja carta vertical, para que el resumen quepa en una página.
     columns: [
-      { header: 'Periodo', width: 16 },
       { header: 'Sección', width: 26 },
       ...SALE_CUTS.map((cut) => ({ header: `Corte ${cut}`, money: true, width: 14 })),
-      { header: 'Total', money: true, width: 16 },
-      { header: 'Reportaron', width: 13 },
-      { header: 'Promedio por emprendedor', money: true, width: 24 },
+      { header: 'Total', money: true, width: 15 },
+      { header: 'Reportaron', width: 11, center: true },
+      { header: 'Promedio por emprendedor', money: true, width: 15 },
     ],
     rows: summaryRows,
     boldRows,
+    groupRows,
   };
 
   const detail = salesByEntrepreneur(state);
@@ -142,10 +153,19 @@ export function buildSalesSheets(state: FairState): SheetSpec[] {
       if (key === null && rows.length === 0) return null;
       const sum = (pick: (d: EntrepreneurSales) => number) => rows.reduce((n, d) => n + pick(d), 0);
       const sumCut = (day: EventDay, cut: SaleCut) => sum((d) => d.cuts[day][cut] ?? 0);
+      const reporters = rows.filter((d) => EVENT_DAYS.some((day) => SALE_CUTS.some((cut) => d.cuts[day][cut] !== null))).length;
       return {
         name: sectionLabel(key),
+        title: `Ventas de ${sectionLabel(key)}, de mayor a menor`,
+        notes: ['Las celdas vacías son cortes que todavía no se han registrado (distinto de haber vendido $ 0).'],
+        highlights: [
+          { label: 'Ventas de la sección', value: sum((d) => d.total), money: true },
+          { label: 'Emprendedores', value: rows.length, tone: 'neutral' },
+          { label: 'Reportaron ventas', value: reporters, tone: 'amarillo' },
+        ],
+        emptyText: 'No hay emprendedores en esta sección.',
         columns: [
-          { header: 'Stand', width: 8 },
+          { header: 'Stand', width: 8, center: true },
           { header: 'Documento', text: true, width: 14 },
           { header: 'Emprendedor', width: 28 },
           { header: 'Emprendimiento', width: 30 },
@@ -167,7 +187,7 @@ export function buildSalesSheets(state: FairState): SheetSpec[] {
           '',
           '',
           'Total',
-          `${rows.length} emprendedores`,
+          plural(rows.length, 'emprendedor', 'emprendedores'),
           ...EVENT_DAYS.flatMap((day) => [...SALE_CUTS.map((cut) => sumCut(day, cut)), sum((d) => d.dayTotal[day])]),
           sum((d) => d.total),
         ],

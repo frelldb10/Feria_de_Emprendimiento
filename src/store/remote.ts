@@ -15,6 +15,7 @@ import type {
   SaleRecord,
   TrainingAttendance,
   TrainingInfo,
+  Visitor,
 } from './types';
 
 // Filas tal como llegan de PostgREST, en snake_case.
@@ -121,6 +122,16 @@ const toPettyCashExpense = (r: Row): PettyCashExpense => ({
 
 const toActivity = (r: Row): ActivityEntry => ({ id: r.id, at: r.at, kind: r.kind, message: r.message });
 
+const toVisitor = (r: Row): Visitor => ({
+  id: r.id,
+  fullName: r.full_name,
+  document: r.document,
+  origin: r.origin,
+  originDetail: r.origin_detail,
+  at: r.at,
+  visitDate: r.visit_date,
+});
+
 const toEdition = (r: Row): FairEdition => ({
   id: r.id,
   name: r.name,
@@ -155,6 +166,7 @@ export type Slice =
   | 'sales'
   | 'pettyCash'
   | 'activity'
+  | 'visitors'
   | 'editions';
 
 type Updater = (state: FairState) => FairState;
@@ -212,6 +224,22 @@ const loaders: Record<Slice, () => Promise<Updater>> = {
     const rows = data.map(toActivity);
     return (s) => ({ ...s, activity: rows });
   },
+  visitors: async () => {
+    try {
+      const [rows, settings] = await Promise.all([
+        fetchAll('visitors'),
+        supabase.from('app_settings').select('visitors_open').eq('id', 1).maybeSingle(),
+      ]);
+      if (settings.error) throw settings.error;
+      const list = rows.map(toVisitor).sort((a, b) => b.at.localeCompare(a.at));
+      const open = settings.data?.visitors_open ?? true;
+      return (s) => ({ ...s, visitors: { list, open, installed: true } });
+    } catch (error) {
+      // Sin las tablas de visitantes, el resto de la app sigue funcionando.
+      if (!isMissingTable(error)) throw error;
+      return (s) => ({ ...s, visitors: { list: [], open: true, installed: false } });
+    }
+  },
   editions: async () => {
     const { data, error } = await supabase.from('fair_editions').select('*').order('at', { ascending: false });
     if (error) {
@@ -249,7 +277,7 @@ export async function loadAll(): Promise<void> {
 
 /* ---------- Tiempo real ---------- */
 
-// La caja menor y el historial van en un canal aparte: si la base todavía no tiene sus tablas,
+// La caja menor, el historial y los visitantes van en un canal aparte: si la base todavía no tiene sus tablas,
 // el error de ese canal no corta el tiempo real de los demás módulos.
 const CHANNELS: Record<string, Record<string, Slice>> = {
   'feria-datos': {
@@ -267,6 +295,8 @@ const CHANNELS: Record<string, Record<string, Slice>> = {
     petty_cash_funds: 'pettyCash',
     petty_cash_expenses: 'pettyCash',
     fair_editions: 'editions',
+    visitors: 'visitors',
+    app_settings: 'visitors',
   },
 };
 

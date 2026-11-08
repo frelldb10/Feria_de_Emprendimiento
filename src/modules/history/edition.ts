@@ -1,7 +1,8 @@
-import { formatForExport, normalizeText } from '../../lib/format';
-import type { SheetSpec } from '../../lib/xlsx';
+import { formatForExport, normalizeText, plural } from '../../lib/format';
+import type { CellValue, SheetSpec } from '../../lib/xlsx';
 import { pettyCashDay, totalsByCategory } from '../../store/pettyCash';
 import { sectionLabel } from '../../store/sections';
+import { visitorStats } from '../../store/visitors';
 import { computeMetrics, indexAttendance, indexKits, isKitComplete } from '../../store/selectors';
 import { EVENT_DAYS, type EditionEntrepreneur, type EditionSummary, type FairEdition, type FairState } from '../../store/types';
 import { buildBalance, salesByEntrepreneur } from '../finance/balance';
@@ -38,6 +39,7 @@ export function buildEdition(state: FairState): { summary: EditionSummary; entre
         .filter((c) => c.count > 0)
         .map((c) => ({ label: c.label, total: c.total })),
     },
+    visitors: { total: state.visitors.list.length, outsideAstrea: visitorStats(state.visitors.list).outsideAstrea },
   };
 
   const entrepreneurs = state.entrepreneurs.map((e): EditionEntrepreneur => {
@@ -117,6 +119,10 @@ export const COMPARISON_ROWS: ComparisonRow[] = [
       money: true,
     }),
   ),
+  // Las ferias guardadas antes del módulo de visitantes no tienen estas cifras: se muestran con "—".
+  { label: 'Visitantes', value: () => null, group: true },
+  { label: 'Visitantes registrados', value: (c) => c.summary.visitors?.total ?? null },
+  { label: 'Visitantes de fuera de Astrea', value: (c) => c.summary.visitors?.outsideAstrea ?? null },
   { label: 'Caja menor', value: () => null, group: true },
   { label: 'Dinero asignado', value: (c) => c.summary.pettyCash.assigned, money: true },
   { label: 'Dinero gastado', value: (c) => c.summary.pettyCash.spent, money: true },
@@ -132,39 +138,63 @@ export function editionColumn(edition: FairEdition): EditionColumn {
   };
 }
 
-/* ---------- Excel de una feria guardada ---------- */
+/* ---------- Excel con el resumen de una feria (guardada o en curso) ---------- */
 
 const yesNo = (value: boolean) => (value ? 'Sí' : 'No');
 
-export function buildEditionSheets(edition: FairEdition): SheetSpec[] {
-  const column = editionColumn(edition);
-  const rows = COMPARISON_ROWS.filter((r) => !r.group && r.label !== 'Ya habían participado en la feria anterior');
+function summarySheets(column: EditionColumn, notes: string[]): SheetSpec[] {
+  const { summary } = column;
+  const rows: CellValue[][] = [];
+  const groupRows: number[] = [];
+  for (const r of COMPARISON_ROWS) {
+    if (r.label === 'Ya habían participado en la feria anterior') continue;
+    if (r.group) {
+      groupRows.push(rows.length);
+      rows.push([r.label, '']);
+      continue;
+    }
+    const value = r.value(column, undefined);
+    rows.push([r.label, value === null ? 'Sin datos' : r.money ? { value, money: true } : value]);
+  }
+
+  const people = [...column.entrepreneurs].sort((a, b) => a.section.localeCompare(b.section) || a.businessName.localeCompare(b.businessName));
+  const sum = (pick: (e: EditionEntrepreneur) => number) => people.reduce((n, e) => n + pick(e), 0);
+
   return [
     {
-      name: 'Resumen',
-      preface: [edition.name, `Guardada: ${formatForExport(edition.at)} por ${edition.operator}`, `Capacitación: ${edition.summary.training.title}`],
-      columns: [
-        { header: 'Dato', width: 40 },
-        { header: 'Valor', width: 18 },
+      name: 'Resumen general',
+      title: 'Resumen general de la feria',
+      notes,
+      highlights: [
+        { label: 'Emprendedores inscritos', value: summary.entrepreneurs, tone: 'neutral' },
+        { label: 'Asistieron', value: summary.attendance.anyDay },
+        { label: 'Ventas totales', value: summary.sales.total, money: true, tone: 'amarillo' },
+        { label: 'Visitantes', value: summary.visitors?.total ?? 'Sin datos', tone: 'neutral' },
       ],
-      rows: rows.map((r) => [r.label, r.value(column, undefined) ?? '']),
+      columns: [
+        { header: 'Indicador', width: 52 },
+        { header: 'Valor', width: 22 },
+      ],
+      rows,
+      groupRows,
     },
     {
       name: 'Emprendedores',
+      title: 'Resultados de cada emprendedor',
       columns: [
         { header: 'Documento', text: true, width: 14 },
         { header: 'Emprendedor', width: 28 },
         { header: 'Emprendimiento', width: 30 },
         { header: 'Sección', width: 22 },
-        { header: 'Días asistidos', width: 14 },
-        { header: 'Capacitación', width: 13 },
-        { header: 'Kit', width: 11 },
-        { header: 'Cuenta para el bono', width: 18 },
+        { header: 'Días asistidos', width: 14, badge: true },
+        { header: 'Capacitación', width: 13, badge: true },
+        { header: 'Kit', width: 11, badge: true },
+        { header: 'Cuenta para el bono', width: 13, badge: true },
         { header: 'Ventas Día 1', money: true, width: 15 },
         { header: 'Ventas Día 2', money: true, width: 15 },
         { header: 'Ventas total', money: true, width: 15 },
       ],
-      rows: edition.entrepreneurs.map((e) => [
+      rows: people.map((e) => [
         e.document,
         e.ownerName,
         e.businessName,
@@ -177,6 +207,33 @@ export function buildEditionSheets(edition: FairEdition): SheetSpec[] {
         e.sales.day2,
         e.sales.day1 + e.sales.day2,
       ]),
+      totals: [
+        '',
+        'Total',
+        plural(people.length, 'emprendedor', 'emprendedores'),
+        '',
+        '',
+        '',
+        '',
+        '',
+        sum((e) => e.sales.day1),
+        sum((e) => e.sales.day2),
+        sum((e) => e.sales.day1 + e.sales.day2),
+      ],
+      emptyText: 'No hay emprendedores registrados.',
     },
   ];
+}
+
+export function buildEditionSheets(edition: FairEdition): SheetSpec[] {
+  return summarySheets(editionColumn(edition), [
+    `Feria guardada el ${formatForExport(edition.at)} por ${edition.operator}.`,
+    `Capacitación: ${edition.summary.training.title}`,
+  ]);
+}
+
+/** Informe general de la feria en curso: el mismo resumen que se guarda en el historial. */
+export function buildCurrentFairSheets(state: FairState): SheetSpec[] {
+  const { summary, entrepreneurs } = buildEdition(state);
+  return summarySheets({ key: 'actual', name: 'Feria en curso', detail: '', summary, entrepreneurs }, [`Capacitación: ${summary.training.title}`]);
 }

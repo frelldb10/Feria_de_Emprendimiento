@@ -17,6 +17,8 @@ const LogisticsPage = lazy(() => import('./modules/logistics/LogisticsPage').the
 const BonusesPage = lazy(() => import('./modules/bonuses/BonusesPage').then((m) => ({ default: m.BonusesPage })));
 const FinancePage = lazy(() => import('./modules/finance/FinancePage').then((m) => ({ default: m.FinancePage })));
 const HistoryPage = lazy(() => import('./modules/history/HistoryPage').then((m) => ({ default: m.HistoryPage })));
+const VisitorsPage = lazy(() => import('./modules/visitors/VisitorsPage').then((m) => ({ default: m.VisitorsPage })));
+const VisitorFormPage = lazy(() => import('./modules/visitors/VisitorFormPage').then((m) => ({ default: m.VisitorFormPage })));
 const PettyCashPage = lazy(() => import('./modules/pettyCash/PettyCashPage').then((m) => ({ default: m.PettyCashPage })));
 
 function Page({ allow, children }: { allow: Role[]; children: ReactNode }) {
@@ -34,6 +36,15 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/ingresar" element={<LoginPage />} />
+          {/* Formulario público del QR de visitantes: no pide cuenta. */}
+          <Route
+            path="/visita"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <VisitorFormPage />
+              </Suspense>
+            }
+          />
           <Route
             element={
               <RequireRole allow={ROLE_ORDER}>
@@ -45,6 +56,7 @@ export function App() {
             <Route path="/admin/reportes" element={<Page allow={['admin', 'observer']}><ReportsPage /></Page>} />
             <Route path="/admin/usuarios" element={<Page allow={['admin', 'observer']}><UsersPage /></Page>} />
             <Route path="/admin/historial" element={<Page allow={['admin', 'observer']}><HistoryPage /></Page>} />
+            <Route path="/admin/visitantes" element={<Page allow={['admin', 'observer']}><VisitorsPage /></Page>} />
             <Route path="/puerta" element={<Page allow={['admin', 'observer', 'door']}><DoorPage /></Page>} />
             <Route path="/capacitacion" element={<Page allow={['admin', 'observer', 'training']}><TrainingPage /></Page>} />
             <Route path="/logistica" element={<Page allow={['admin', 'observer', 'logistics']}><LogisticsPage /></Page>} />

@@ -9,6 +9,7 @@ import {
   QrCode,
   ScanQrCode,
   Upload,
+  UserRoundCheck,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ const KIND_STYLE: Record<ActivityKind, { icon: LucideIcon; className: string }> 
   'petty-cash': { icon: Wallet, className: 'bg-amarillo-50 text-amarillo-700' },
   correction: { icon: Eraser, className: 'bg-rojo-50 text-rojo-600' },
   archive: { icon: Archive, className: 'bg-carbon-100 text-carbon-700' },
+  visitor: { icon: UserRoundCheck, className: 'bg-verde-50 text-verde-700' },
 };
 
 export function ActivityFeed() {

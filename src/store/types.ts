@@ -154,7 +154,31 @@ export type ActivityKind =
   | 'qr'
   | 'petty-cash'
   | 'correction'
-  | 'archive';
+  | 'archive'
+  | 'visitor';
+
+export type VisitorOrigin = 'astrea_urbano' | 'astrea_rural' | 'cesar' | 'otro_departamento';
+
+/** Persona del público que registró su visita escaneando el QR. */
+export interface Visitor {
+  id: string;
+  fullName: string;
+  document: string;
+  origin: VisitorOrigin;
+  /** Barrio, vereda, municipio o departamento; puede ir vacío en el casco urbano. */
+  originDetail: string;
+  at: string;
+  /** Fecha de la visita en Colombia, AAAA-MM-DD. */
+  visitDate: string;
+}
+
+export interface NewVisitor {
+  fullName: string;
+  document: string;
+  origin: VisitorOrigin;
+  originDetail: string;
+  consent: boolean;
+}
 
 /**
  * Cifras de una feria guardada en el historial. Si cambia la forma, se sube version y la
@@ -170,6 +194,8 @@ export interface EditionSummary {
   sales: { day1: number; day2: number; total: number; reporters: number };
   bySection: { label: string; entrepreneurs: number; sales: number }[];
   pettyCash: { assigned: number; spent: number; byCategory: { label: string; total: number }[] };
+  /** No está en las ferias guardadas antes del módulo de visitantes. */
+  visitors?: { total: number; outsideAstrea: number };
 }
 
 /** Resultado de un emprendedor en una feria guardada. No lleva teléfono ni cuenta bancaria. */
@@ -217,6 +243,14 @@ export interface FairState {
     installed: boolean;
   };
   activity: ActivityEntry[];
+  visitors: {
+    /** Del más reciente al más antiguo. */
+    list: Visitor[];
+    /** Si el formulario público del QR acepta registros. */
+    open: boolean;
+    /** false si la base todavía no tiene la tabla de visitantes (falta ejecutar schema.sql). */
+    installed: boolean;
+  };
   editions: {
     /** De la más reciente a la más antigua. */
     list: FairEdition[];

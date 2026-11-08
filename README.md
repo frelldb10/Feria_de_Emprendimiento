@@ -83,10 +83,11 @@ src/
     bonuses/     Cuenta bancaria para el bono de emprendimiento
     finance/     Ventas por corte, balance por sección y comparación de días
     pettyCash/   Caja menor: dinero de cada día, gastos por categoría y reporte
-    reports/     Los seis reportes en Excel
+    reports/     Los reportes en Excel (siete por módulo y el informe general)
     history/     Historial de ferias: resumen guardado, comparación y Excel
+    visitors/    Formulario público del QR de visitantes, pantalla del administrador y cartel
   store/         Copia en pantalla de los datos, lectura del servidor, acciones y reglas
-  lib/           Cliente de Supabase, Excel, fechas, fotos
+  lib/           Cliente de Supabase, Excel con membrete (xlsx.ts), fechas, fotos
 ```
 
 ## Carga masiva
@@ -118,6 +119,15 @@ Antes de cargar se muestra una vista previa que marca las filas con errores y lo
 - **Kits:** se puede registrar una entrega parcial y completarla después; cada registro exige foto, que se achica antes de subirla para que no tarde.
 - **Caja menor:** el administrador escribe cuánto dinero se entrega para el Día 1 y para el Día 2; si entrega más durante el día, escribe el nuevo total. Cada gasto lleva valor, categoría (transporte, alimentación y refrigerios, papelería e impresiones, ferretería y materiales, aseo o imprevistos) y descripción; la hora y quién lo registró los pone el servidor. Cada día se lleva aparte: lo que sobra del Día 1 no pasa al Día 2. Un gasto mal registrado solo lo elimina el administrador, y queda anotado en la actividad.
 
+## Visitantes
+
+El público registra su visita escaneando un QR, sin cuenta: abre la página `/visita`, escribe nombre, cédula y de dónde viene (casco urbano o zona rural de Astrea, otro municipio del Cesar u otro departamento, con el barrio, la vereda o el municipio) y autoriza el tratamiento de datos (Ley 1581 de 2012).
+
+- El visitante solo puede registrarse; no puede ver los datos de nadie. La base revisa los datos aunque alguien intente saltarse el formulario.
+- Una cédula se registra una sola vez por día; si lo intenta otra vez, se le agradece sin duplicar el registro.
+- En **Visitantes** (solo administrador y observador) están la lista en tiempo real, las cifras por procedencia, los lugares más frecuentes, el **cartel con el QR** para imprimir y el Excel. El administrador abre o cierra el registro (cerrado, el QR avisa que terminó) y puede borrar registros de prueba.
+- El QR apunta a la dirección desde la que se abre la app: el cartel hay que imprimirlo desde la dirección de Vercel, no desde `localhost`.
+
 ## Historial de ferias
 
 Al terminar una feria, el administrador entra a **Historial** y toca "Guardar feria actual". Se guardan las cifras (inscritos, ingresos por día, capacitación, kits, bonos, ventas por día y sección, caja menor) y la lista de emprendedores con sus resultados. No se guardan teléfonos, cuentas bancarias ni fotos: si se necesitan, se descargan antes los reportes.
@@ -130,12 +140,16 @@ La pantalla compara la feria en curso con las guardadas, cifra por cifra, con el
 
 | Reporte | Hojas |
 | --- | --- |
-| Asistencia a la feria | Asistencia |
+| Informe general de la feria | Resumen general (todas las cifras por tema: participación, capacitación y entregas, ventas, visitantes y caja menor) y Emprendedores (cada uno con días asistidos, capacitación, kit, cuenta para el bono y ventas) |
+| Asistencia a la feria | Resumen por sección y Detalle de ingresos |
 | Asistencia a capacitación | Asistieron (con nombre, fecha y lugar) y No asistieron |
-| Kits | Kits, con el nombre de la foto. Además, un **informe en Word**: resumen, detalle de cada entrega, pendientes, emprendedores sin kit, observaciones y firmas |
+| Kits | Entregas (con el nombre de la foto) y Sin kit. Además, un **informe en Word**: resumen, detalle de cada entrega, pendientes, emprendedores sin kit, observaciones y firmas |
 | Bonos de emprendimiento | Cuentas para transferir y Asistentes sin cuenta |
 | Ventas por sección | Resumen por día y corte, y una hoja por sección con cada emprendedor |
-| Caja menor | Resumen (asignado, gastado y saldo por día), Gastos (cada gasto con fecha, categoría, descripción, valor y quién lo registró) y Por categoría |
+| Caja menor | Resumen por día (asignado, gastado y saldo), Gastos (cada gasto con fecha, categoría, descripción, valor y quién lo registró) y Por categoría |
+| Visitantes | Resumen por procedencia, Visitantes, Lugares y Por día |
+
+Todas las hojas salen con el mismo diseño: membrete con el escudo de Astrea y el logo de la Feria, la franja verde, roja y amarilla, el nombre de quien lo descargó y la fecha, recuadros con las cifras principales, encabezados en verde, filas alternas, estados en color (Sí y Completo en verde, Parcial en amarillo, No y Pendiente en rojo) y una fila de totales. Vienen listas para imprimir en hoja carta: todo el ancho en una página, los resúmenes en una sola hoja, el encabezado de la tabla repetido en cada página y el número de página al pie. El Excel de cada feria guardada en el Historial sale con el mismo diseño.
 
 El administrador los descarga desde Reportes; el operador de capacitación, el de logística (Word), el de bonos, el financiero y el de caja menor, desde su propia pantalla.
 

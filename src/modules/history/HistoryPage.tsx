@@ -14,6 +14,7 @@ import { downloadWorkbook } from '../../lib/xlsx';
 import { deleteEdition } from '../../store/actions';
 import { useFairState } from '../../store/fairStore';
 import type { FairEdition } from '../../store/types';
+import { useAuth } from '../auth/AuthContext';
 import { useCanEdit } from '../auth/useCanEdit';
 import { ArchiveModal } from './ArchiveModal';
 import { buildEdition, buildEditionSheets, COMPARISON_ROWS, editionColumn, type EditionColumn } from './edition';
@@ -141,6 +142,7 @@ function ComparisonTable({ columns }: { columns: EditionColumn[] }) {
 }
 
 function SavedEditions({ editions, canDelete }: { editions: FairEdition[]; canDelete: boolean }) {
+  const { operator } = useAuth();
   const [removing, setRemoving] = useState<FairEdition | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -184,7 +186,13 @@ function SavedEditions({ editions, canDelete }: { editions: FairEdition[]; canDe
               <AsyncButton
                 variant="secondary"
                 icon={Download}
-                onRun={() => downloadWorkbook(`feria-astrea_historial_${fileStamp(new Date(edition.at))}.xlsx`, buildEditionSheets(edition))}
+                onRun={() =>
+                  downloadWorkbook(
+                    `feria-astrea_historial_${fileStamp(new Date(edition.at))}.xlsx`,
+                    { title: edition.name, generatedBy: operator },
+                    buildEditionSheets(edition),
+                  )
+                }
               >
                 Excel
               </AsyncButton>

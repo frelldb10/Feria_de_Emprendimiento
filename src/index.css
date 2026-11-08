@@ -91,6 +91,7 @@
 
   body[data-printing="modal"] {
     overflow: visible !important;
+    background: #fff;
   }
 
   body[data-printing="modal"] #root {
