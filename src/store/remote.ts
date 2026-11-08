@@ -131,7 +131,6 @@ const toVisitor = (r: Row): Visitor => ({
   at: r.at,
   visitDate: r.visit_date,
   phone: r.phone ?? '',
-  groupSize: r.group_size ?? null,
   heardFrom: r.heard_from ?? null,
 });
 

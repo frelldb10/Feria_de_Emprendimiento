@@ -1,4 +1,4 @@
-import { normalizeText } from '../lib/format';
+import { formatDateOnly, normalizeText } from '../lib/format';
 import type { HeardFrom, Visitor, VisitorOrigin } from './types';
 
 // Las listas deben coincidir con las restricciones de visitors en schema.sql.
@@ -13,14 +13,6 @@ export interface Option<T> {
   id: T;
   label: string;
 }
-
-export const GROUP_SIZES: Option<number>[] = [
-  { id: 1, label: 'Solo yo' },
-  { id: 2, label: '2 personas' },
-  { id: 3, label: '3 personas' },
-  { id: 4, label: '4 personas' },
-  { id: 5, label: '5 o más' },
-];
 
 export const HEARD_FROM: Option<HeardFrom>[] = [
   { id: 'redes', label: 'Redes sociales' },
@@ -73,8 +65,6 @@ export function hourInColombia(iso: string): number {
 export interface VisitorStats {
   total: number;
   today: number;
-  /** Personas distintas (una cédula puede volver otro día). */
-  people: number;
   outsideAstrea: number;
   byOrigin: { origin: VisitorOrigin; label: string; count: number }[];
   /** Los lugares que más se repiten en el detalle (barrio, vereda o municipio). */
@@ -96,7 +86,6 @@ export function visitorStats(list: Visitor[]): VisitorStats {
   return {
     total: list.length,
     today: list.filter((v) => v.visitDate === today).length,
-    people: new Set(list.map((v) => v.document)).size,
     outsideAstrea: list.filter((v) => isFromOutside(v.origin)).length,
     byOrigin: VISITOR_ORIGINS.map((o) => ({ origin: o.id, label: o.label, count: list.filter((v) => v.origin === o.id).length })),
     topPlaces: [...places.values()].sort((a, b) => b.count - a.count).slice(0, 5),
@@ -118,12 +107,11 @@ export interface TourismStats {
   regional: number;
   /** Otros departamentos. */
   national: number;
-  /** Personas promedio por grupo, entre quienes respondieron. */
-  averageGroup: number;
   /** Registros con las respuestas de la encuesta (los anteriores no las tienen). */
   answeredSurvey: number;
-  byGroup: Tally[];
   byHeard: Tally[];
+  /** Registros de cada día de la feria. */
+  byDay: Tally[];
 }
 
 function tally<T>(options: Option<T>[], values: Array<T | null>): Tally[] {
@@ -134,16 +122,15 @@ function tally<T>(options: Option<T>[], values: Array<T | null>): Tally[] {
 export function tourismStats(list: Visitor[]): TourismStats {
   const regional = list.filter((v) => v.origin === 'cesar').length;
   const national = list.filter((v) => v.origin === 'otro_departamento').length;
-  const groups = list.filter((v) => v.groupSize !== null);
+  const dates = [...new Set(list.map((v) => v.visitDate))].sort();
   return {
     total: list.length,
     locals: list.length - regional - national,
     visitors: regional + national,
     regional,
     national,
-    averageGroup: groups.length > 0 ? groups.reduce((sum, v) => sum + (v.groupSize ?? 0), 0) / groups.length : 0,
     answeredSurvey: list.filter((v) => v.heardFrom !== null).length,
-    byGroup: tally(GROUP_SIZES, list.map((v) => v.groupSize)),
     byHeard: tally(HEARD_FROM, list.map((v) => v.heardFrom)),
+    byDay: dates.map((date) => ({ label: formatDateOnly(date), count: list.filter((v) => v.visitDate === date).length })),
   };
 }

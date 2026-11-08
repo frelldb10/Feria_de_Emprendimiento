@@ -2,8 +2,6 @@ import { Card } from '../../components/ui/Card';
 import { cn } from '../../lib/cn';
 import type { Tally, TourismStats } from '../../store/visitors';
 
-const decimal = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
-
 function Figure({ label, value, detail, tone }: { label: string; value: number; detail: string; tone: 'verde' | 'amarillo' | 'carbon' }) {
   return (
     <div className={cn('rounded-lg border-t-4 bg-carbon-50 px-4 py-3', tone === 'verde' ? 'border-verde-600' : tone === 'amarillo' ? 'border-amarillo-500' : 'border-carbon-400')}>
@@ -62,14 +60,8 @@ export function TourismCard({ stats }: { stats: TourismStats }) {
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Bars title="Cómo se enteraron de la feria" items={stats.byHeard} empty="Todavía no hay respuestas." />
-        <Bars title="Personas por grupo" items={stats.byGroup} empty="Todavía no hay respuestas." />
+        <Bars title="Registros por día" items={stats.byDay} empty="Todavía no hay registros." />
       </div>
-      {stats.averageGroup > 0 && (
-        <p className="mt-5 border-t border-carbon-100 pt-4 text-sm text-carbon-600">
-          Grupos de <span className="font-semibold text-carbon-900">{decimal.format(stats.averageGroup)} personas</span> en promedio, contando a quien se
-          registra.
-        </p>
-      )}
     </Card>
   );
 }

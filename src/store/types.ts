@@ -163,8 +163,6 @@ export type HeardFrom = 'redes' | 'radio' | 'conocidos' | 'de_paso' | 'otro';
 /** Preguntas de la encuesta para las estadísticas de turismo. */
 export interface VisitorSurvey {
   phone: string;
-  /** Personas del grupo de viaje, contándose a sí mismo; 5 quiere decir "5 o más". */
-  groupSize: number | null;
   heardFrom: HeardFrom | null;
 }
 

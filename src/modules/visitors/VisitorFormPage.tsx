@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { CircleCheckBig, Clock, LoaderCircle, UserRoundCheck } from 'lucide-react';
+import { CircleAlert, CircleCheckBig, Clock, LoaderCircle, UserRoundCheck } from 'lucide-react';
 import { BrandStripe } from '../../components/brand/BrandStripe';
 import { Escudo, FeriaLogo } from '../../components/brand/Logos';
 import { Button } from '../../components/ui/Button';
@@ -10,7 +10,7 @@ import { cn } from '../../lib/cn';
 import { describeError } from '../../lib/supabase';
 import { isFullName, onlyDigits, onlyLetters } from '../../lib/text';
 import { isVisitorRegistrationOpen, registerVisitor } from '../../store/actions';
-import { GROUP_SIZES, HEARD_FROM, isColombianPhone, VISITOR_ORIGINS, type Option } from '../../store/visitors';
+import { HEARD_FROM, isColombianPhone, VISITOR_ORIGINS, type Option } from '../../store/visitors';
 import type { HeardFrom, VisitorOrigin } from '../../store/types';
 
 type Phase = 'loading' | 'closed' | 'unavailable' | 'form' | 'done' | 'repeated';
@@ -21,7 +21,6 @@ interface Form {
   phone: string;
   origin: VisitorOrigin | '';
   originDetail: string;
-  groupSize: number | null;
   heardFrom: HeardFrom | null;
   consent: boolean;
 }
@@ -34,7 +33,6 @@ const EMPTY: Form = {
   phone: '',
   origin: '',
   originDetail: '',
-  groupSize: null,
   heardFrom: null,
   consent: false,
 };
@@ -47,7 +45,6 @@ function validate(form: Form): Errors {
   const origin = VISITOR_ORIGINS.find((o) => o.id === form.origin);
   if (!origin) errors.origin = 'Elige de dónde nos visitas.';
   else if (origin.detailRequired && form.originDetail.trim().length < 2) errors.originDetail = `Escribe ${origin.detailLabel.toLowerCase()}.`;
-  if (form.groupSize === null) errors.groupSize = 'Elige con cuántas personas vienes.';
   if (form.heardFrom === null) errors.heardFrom = 'Elige cómo te enteraste de la feria.';
   if (!form.consent) errors.consent = 'Para registrarte debes autorizar el tratamiento de tus datos.';
   return errors;
@@ -146,7 +143,6 @@ export function VisitorFormPage() {
         phone: form.phone,
         origin: form.origin,
         originDetail: form.originDetail.trim(),
-        groupSize: form.groupSize,
         heardFrom: form.heardFrom,
         consent: form.consent,
       });
@@ -202,12 +198,24 @@ export function VisitorFormPage() {
             </div>
           )}
 
-          {(phase === 'done' || phase === 'repeated') && (
+          {phase === 'done' && (
             <div className="py-4 text-center">
               <CircleCheckBig className="mx-auto size-14 text-verde-600" strokeWidth={1.75} aria-hidden />
               <h1 className="mt-3 text-2xl font-semibold tracking-tight">¡Gracias, {registeredName}!</h1>
+              <p className="mt-2 text-carbon-600">Tu visita quedó registrada. Disfruta la feria.</p>
+              <Button variant="secondary" size="lg" icon={UserRoundCheck} onClick={another} className="mt-6">
+                Registrar a otra persona
+              </Button>
+            </div>
+          )}
+
+          {/* La cédula ya estaba: no se guarda otro registro, ni el mismo día ni el otro día de la feria. */}
+          {phase === 'repeated' && (
+            <div className="py-4 text-center">
+              <CircleAlert className="mx-auto size-14 text-amarillo-600" strokeWidth={1.75} aria-hidden />
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight">Esta cédula ya está registrada</h1>
               <p className="mt-2 text-carbon-600">
-                {phase === 'done' ? 'Tu visita quedó registrada. Disfruta la feria.' : 'Esta cédula ya registró su visita hoy. Disfruta la feria.'}
+                Cada persona se registra una sola vez durante la feria. Tu registro anterior sigue guardado: no tienes que hacer nada más.
               </p>
               <Button variant="secondary" size="lg" icon={UserRoundCheck} onClick={another} className="mt-6">
                 Registrar a otra persona
@@ -276,15 +284,6 @@ export function VisitorFormPage() {
                 />
               )}
 
-              <ChoiceGroup
-                name="groupSize"
-                legend="¿Cuántas personas vienen en tu grupo, contándote a ti?"
-                options={GROUP_SIZES}
-                value={form.groupSize}
-                onChange={(value) => update('groupSize', value)}
-                error={errors.groupSize}
-                compact
-              />
               <ChoiceGroup
                 name="heardFrom"
                 legend="¿Cómo te enteraste de la feria?"

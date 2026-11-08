@@ -64,25 +64,21 @@ export function buildTourismSheets(state: FairState): SheetSpec[] {
     rows.push([`Mercado ${MARKET[o.id].toLowerCase()}: ${o.label}`, count, pct(count, t.total)]);
   }
 
-  group('3. Grupo de viaje (registros con respuesta)');
-  rows.push(['Tamaño promedio del grupo (personas)', { value: t.averageGroup, decimal: true }, '']);
-  tallyRows(t.byGroup);
-
-  group('4. Cómo se enteraron de la feria (registros con respuesta)');
+  group('3. Cómo se enteraron de la feria (registros con respuesta)');
   tallyRows(t.byHeard);
 
-  group('5. Afluencia');
+  group('4. Afluencia');
   rows.push([`Día con más registros: ${busiestDay ? formatDateOnly(busiestDay.date) : 'sin registros'}`, busiestDay?.count ?? 0, pct(busiestDay?.count ?? 0, t.total)]);
   rows.push([`Hora con más registros: ${busiestHour ? hourRange(busiestHour[0]) : 'sin registros'}`, busiestHour?.[1] ?? 0, pct(busiestHour?.[1] ?? 0, t.total)]);
 
-  group('6. Movimiento económico de la feria');
+  group('5. Movimiento económico de la feria');
   rows.push(['Ventas reportadas por los emprendedores', { value: sales.total, money: true }, '']);
   rows.push(['Emprendedores que reportaron ventas', sales.reporters, '']);
   rows.push(['Ventas por visitante registrado (referencia)', { value: t.total > 0 ? Math.round(sales.total / t.total) : 0, money: true }, '']);
 
   const notes = [
     'Clasificación según las Recomendaciones Internacionales para Estadísticas de Turismo (RIET 2008) de Naciones Unidas y la OMT.',
-    `Fuente: registro de visitantes por QR, ${t.total} registros en ${dates.length === 1 ? '1 día' : `${dates.length} días`}. Cada persona cuenta una vez por día.`,
+    `Fuente: registro de visitantes por QR, ${t.total} registros en ${dates.length === 1 ? '1 día' : `${dates.length} días`}. Cada persona se registra una sola vez durante la feria.`,
   ];
   if (withoutSurvey > 0) notes.push(`${withoutSurvey} registros se hicieron antes de la encuesta turística y no tienen esas respuestas.`);
 
@@ -93,8 +89,8 @@ export function buildTourismSheets(state: FairState): SheetSpec[] {
     highlights: [
       { label: 'Visitantes registrados', value: t.total, tone: 'neutral' },
       { label: 'Público local', value: t.locals, tone: 'neutral' },
-      { label: 'Visitantes de otros municipios', value: t.visitors },
-      { label: 'Personas por grupo (promedio)', value: t.averageGroup, decimal: true, tone: 'amarillo' },
+      { label: 'Mercado regional (Cesar)', value: t.regional },
+      { label: 'Mercado nacional', value: t.national, tone: 'amarillo' },
     ],
     columns: [
       { header: 'Indicador', width: 56 },
@@ -170,9 +166,8 @@ export function buildTourismSheets(state: FairState): SheetSpec[] {
       ['Público local', 'Personas que viven en Astrea, en el casco urbano o en la zona rural. Están en su entorno habitual: son público de la feria, pero no visitantes en sentido turístico.'],
       ['Turistas y excursionistas', 'La OMT divide a los visitantes en turistas (pasan al menos una noche) y excursionistas (regresan el mismo día). El registro de la feria no pregunta por la noche, así que este informe los cuenta juntos como visitantes.'],
       ['Mercado', 'Local: Astrea. Regional: otros municipios del Cesar. Nacional: otros departamentos.'],
-      ['Grupo de viaje', 'Personas que llegan juntas, contando a quien se registra. Si varias personas del mismo grupo se registran, el grupo aparece más de una vez.'],
       ['Ventas por visitante', 'Ventas reportadas por los emprendedores divididas entre los visitantes registrados. Es una referencia: no todo el público se registra.'],
-      ['Fuente de los datos', 'Registro voluntario con el QR de la entrada. Cada persona se registra una vez por día con su cédula. No es una muestra estadística: las cifras describen a quienes se registraron.'],
+      ['Fuente de los datos', 'Registro voluntario con el QR de la entrada. Cada persona se registra una sola vez durante la feria con su cédula: si vuelve el otro día, no se cuenta de nuevo. No es una muestra estadística: las cifras describen a quienes se registraron.'],
     ],
   };
 

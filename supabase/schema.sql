@@ -241,18 +241,20 @@ create table if not exists public.visitors (
   at timestamptz not null default now(),
   visit_date date not null default ((now() at time zone 'America/Bogota')::date)
 );
--- Una cédula se registra una sola vez por día.
-create unique index if not exists visitors_document_date_idx on public.visitors (document, visit_date);
--- Encuesta (teléfono, tamaño del grupo y cómo se enteró). Los registros anteriores quedan con el
--- teléfono vacío y lo demás en null.
+-- Una cédula se registra una sola vez en toda la feria (ni el mismo día ni el otro día).
+-- Si alguna cédula quedó registrada dos veces con la regla anterior, se conserva el primer registro.
+delete from public.visitors a using public.visitors b
+  where a.document = b.document and (a.at, a.id) > (b.at, b.id);
+drop index if exists public.visitors_document_date_idx;
+create unique index if not exists visitors_document_idx on public.visitors (document);
+-- Encuesta (teléfono y cómo se enteró). Los registros anteriores quedan con el teléfono vacío.
 alter table public.visitors add column if not exists phone text not null default ''
   check (phone ~ '^([0-9]{10})?$');
-alter table public.visitors add column if not exists group_size smallint check (group_size between 1 and 5);
 alter table public.visitors add column if not exists heard_from text
   check (heard_from in ('redes', 'radio', 'conocidos', 'de_paso', 'otro'));
--- Las preguntas del viaje (motivo, noches, hospedaje y transporte) se quitaron de la encuesta.
+-- Preguntas que se quitaron de la encuesta.
 alter table public.visitors drop column if exists trip_purpose, drop column if exists nights,
-  drop column if exists lodging, drop column if exists transport;
+  drop column if exists lodging, drop column if exists transport, drop column if exists group_size;
 
 -- Ajustes de la app (una sola fila). visitors_open abre o cierra el formulario público de visitantes.
 create table if not exists public.app_settings (
@@ -706,12 +708,13 @@ as $$
 $$;
 
 -- Registro de un visitante desde el QR, sin cuenta. La base revisa los datos aunque alguien se salte
--- el formulario. Si la cédula ya se registró hoy devuelve "duplicate" y no guarda nada.
+-- el formulario. Si la cédula ya se registró en la feria devuelve "duplicate" y no guarda nada.
 drop function if exists public.register_visitor(text, text, text, text, boolean);
 drop function if exists public.register_visitor(text, text, text, text, boolean, text, integer, text, text, integer, text, text);
+drop function if exists public.register_visitor(text, text, text, text, boolean, text, integer, text);
 create or replace function public.register_visitor(
   p_full_name text, p_document text, p_origin text, p_origin_detail text, p_consent boolean,
-  p_phone text default null, p_group_size integer default null, p_heard_from text default null
+  p_phone text default null, p_heard_from text default null
 )
 returns jsonb
 language plpgsql security definer set search_path = ''
@@ -741,17 +744,14 @@ begin
   if p_origin <> 'astrea_urbano' and char_length(v_detail) < 2 then
     raise exception 'Escribe la vereda, el municipio o el departamento.' using errcode = 'P0001';
   end if;
-  if p_group_size is null or p_group_size not between 1 and 5 then
-    raise exception 'Elige con cuántas personas vienes.' using errcode = 'P0001';
-  end if;
   if p_heard_from is null or p_heard_from not in ('redes', 'radio', 'conocidos', 'de_paso', 'otro') then
     raise exception 'Elige cómo te enteraste de la feria.' using errcode = 'P0001';
   end if;
   if p_consent is not true then
     raise exception 'Para registrarte debes autorizar el tratamiento de tus datos.' using errcode = 'P0001';
   end if;
-  insert into public.visitors (full_name, document, phone, origin, origin_detail, group_size, heard_from, data_consent, visit_date)
-  values (v_name, v_document, v_phone, p_origin, v_detail, p_group_size, p_heard_from, true, (now() at time zone 'America/Bogota')::date)
+  insert into public.visitors (full_name, document, phone, origin, origin_detail, heard_from, data_consent, visit_date)
+  values (v_name, v_document, v_phone, p_origin, v_detail, p_heard_from, true, (now() at time zone 'America/Bogota')::date)
   on conflict do nothing
   returning id into saved_id;
   return jsonb_build_object('status', case when saved_id is null then 'duplicate' else 'ok' end);
@@ -759,9 +759,9 @@ end;
 $$;
 
 revoke execute on function public.visitor_registration_open() from public;
-revoke execute on function public.register_visitor(text, text, text, text, boolean, text, integer, text) from public;
+revoke execute on function public.register_visitor(text, text, text, text, boolean, text, text) from public;
 grant execute on function public.visitor_registration_open() to anon, authenticated;
-grant execute on function public.register_visitor(text, text, text, text, boolean, text, integer, text) to anon, authenticated;
+grant execute on function public.register_visitor(text, text, text, text, boolean, text, text) to anon, authenticated;
 
 revoke execute on function public.register_attendance(uuid, integer, text) from public, anon;
 revoke execute on function public.register_training(uuid, text) from public, anon;

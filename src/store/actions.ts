@@ -403,7 +403,7 @@ export async function loadDemoEntrepreneurs(): Promise<number> {
 
 /* ---------- Visitantes ---------- */
 
-/** Formulario público del QR: no necesita cuenta. Devuelve "duplicate" si la cédula ya se registró hoy. */
+/** Formulario público del QR: no necesita cuenta. Devuelve "duplicate" si la cédula ya se registró en la feria. */
 export async function registerVisitor(visitor: NewVisitor): Promise<'ok' | 'duplicate'> {
   const reply = (await run(() =>
     supabase.rpc('register_visitor', {
@@ -413,7 +413,6 @@ export async function registerVisitor(visitor: NewVisitor): Promise<'ok' | 'dupl
       p_origin_detail: visitor.originDetail,
       p_consent: visitor.consent,
       p_phone: visitor.phone,
-      p_group_size: visitor.groupSize,
       p_heard_from: visitor.heardFrom,
     }),
   )) as { status: 'ok' | 'duplicate' };

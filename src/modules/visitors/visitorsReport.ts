@@ -1,7 +1,7 @@
 import { formatDateOnly, formatForExport } from '../../lib/format';
 import type { SheetSpec } from '../../lib/xlsx';
 import type { FairState } from '../../store/types';
-import { GROUP_SIZES, HEARD_FROM, optionLabel, originLabel, visitorStats } from '../../store/visitors';
+import { HEARD_FROM, optionLabel, originLabel, visitorStats } from '../../store/visitors';
 
 /** Libro de Excel: resumen por procedencia, cada visitante, lugares más frecuentes y registros por día. */
 export function buildVisitorSheets(state: FairState): SheetSpec[] {
@@ -27,7 +27,7 @@ export function buildVisitorSheets(state: FairState): SheetSpec[] {
       title: 'Visitantes por procedencia',
       highlights: [
         { label: 'Visitantes registrados', value: stats.total },
-        { label: 'Personas distintas', value: stats.people, tone: 'neutral' },
+        { label: 'De Astrea', value: stats.total - stats.outsideAstrea, tone: 'neutral' },
         { label: 'De fuera de Astrea', value: stats.outsideAstrea, tone: 'amarillo' },
       ],
       columns: [
@@ -49,7 +49,6 @@ export function buildVisitorSheets(state: FairState): SheetSpec[] {
         { header: 'Teléfono', text: true, width: 13 },
         { header: 'Procedencia', width: 24 },
         { header: 'Barrio, vereda o municipio', width: 26 },
-        { header: 'Grupo', width: 11, center: true },
         { header: 'Cómo se enteró', width: 20 },
       ],
       rows: list.map((v, i) => [
@@ -60,7 +59,6 @@ export function buildVisitorSheets(state: FairState): SheetSpec[] {
         v.phone,
         originLabel(v.origin),
         v.originDetail,
-        optionLabel(GROUP_SIZES, v.groupSize),
         optionLabel(HEARD_FROM, v.heardFrom),
       ]),
       emptyText: 'Todavía no hay visitantes registrados.',

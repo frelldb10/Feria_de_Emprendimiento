@@ -70,7 +70,7 @@ export function VisitorsPage() {
                 <StatCard
                   label="Visitantes registrados"
                   value={stats.total}
-                  detail={stats.people === stats.total ? 'Cada uno una vez' : `${stats.people} personas distintas`}
+                  detail="Una sola vez por persona"
                   icon={Users}
                   accent="verde"
                 />
