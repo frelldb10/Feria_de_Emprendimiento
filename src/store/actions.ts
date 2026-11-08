@@ -412,6 +412,13 @@ export async function registerVisitor(visitor: NewVisitor): Promise<'ok' | 'dupl
       p_origin: visitor.origin,
       p_origin_detail: visitor.originDetail,
       p_consent: visitor.consent,
+      p_phone: visitor.phone,
+      p_group_size: visitor.groupSize,
+      p_heard_from: visitor.heardFrom,
+      p_trip_purpose: visitor.tripPurpose,
+      p_nights: visitor.nights,
+      p_lodging: visitor.lodging,
+      p_transport: visitor.transport,
     }),
   )) as { status: 'ok' | 'duplicate' };
   return reply.status;

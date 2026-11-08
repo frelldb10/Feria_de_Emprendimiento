@@ -11,6 +11,8 @@ export interface FormattedNumber {
   value: number;
   money?: boolean;
   percent?: boolean;
+  /** Con un decimal, como un promedio: 1,7. */
+  decimal?: boolean;
 }
 
 export type CellValue = Value | FormattedNumber;
@@ -24,12 +26,16 @@ export interface ColumnSpec {
   money?: boolean;
   /** Texto literal: evita que Excel convierta documentos y cuentas en notación científica. */
   text?: boolean;
+  /** Con un decimal, como un promedio. */
+  decimal?: boolean;
   /** Proporción de 0 a 1 que se muestra como porcentaje. */
   percent?: boolean;
   /** Datos cortos que se leen mejor centrados: día, stand, N°. */
   center?: boolean;
   /** Resalta con color los estados conocidos: Sí y Completo en verde, No y Pendiente en rojo, Parcial en amarillo. */
   badge?: boolean;
+  /** Texto largo que salta de línea; la fila crece según lo que haga falta. */
+  wrap?: boolean;
 }
 
 /** Cifra destacada que va en un recuadro encima de la tabla. */
@@ -38,6 +44,7 @@ export interface Highlight {
   value: Value;
   money?: boolean;
   percent?: boolean;
+  decimal?: boolean;
   tone?: Tone;
 }
 
@@ -102,6 +109,7 @@ const BADGE_TONE: Record<string, Tone> = {
 const MONEY_FORMAT = '"$" #,##0;[Red]-"$" #,##0';
 const COUNT_FORMAT = '#,##0';
 const PERCENT_FORMAT = '0%';
+const DECIMAL_FORMAT = '#,##0.0';
 
 /** Ancho mínimo (en caracteres) para que el encabezado y los recuadros no se amontonen. */
 const MIN_TABLE_CHARS = 86;
@@ -125,10 +133,22 @@ function columnWidths(columns: ColumnSpec[]): number[] {
   return widths.map((w) => Math.round(((w * MIN_TABLE_CHARS) / total) * 10) / 10);
 }
 
-function numberFormat(spec: { money?: boolean; percent?: boolean }): string {
+function numberFormat(spec: { money?: boolean; percent?: boolean; decimal?: boolean }): string {
   if (spec.money) return MONEY_FORMAT;
   if (spec.percent) return PERCENT_FORMAT;
+  if (spec.decimal) return DECIMAL_FORMAT;
   return COUNT_FORMAT;
+}
+
+/** Alto de una fila con texto que salta de línea (Calibri 10: unos 1,25 caracteres por unidad de ancho). */
+function wrappedHeight(row: CellValue[], columns: ColumnSpec[], widths: number[]): number {
+  let lines = 1;
+  row.forEach((value, i) => {
+    if (!columns[i]?.wrap || typeof value !== 'string') return;
+    const perLine = Math.max(8, Math.floor(widths[i] * 1.25));
+    lines = Math.max(lines, Math.ceil(value.length / perLine));
+  });
+  return lines === 1 ? 18 : lines * 13 + 6;
 }
 
 function alignOf(column: ColumnSpec | undefined, value: CellValue): 'left' | 'center' | 'right' {
@@ -187,7 +207,13 @@ const grouped = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
 /** Tamaño de letra de la cifra para que quepa en su recuadro (si no cabe, Excel muestra ####). */
 function fitFontSize(h: Highlight, boxPx: number): number {
   const text =
-    typeof h.value === 'string' ? h.value : h.percent ? `${Math.round(h.value * 100)}%` : `${h.money ? '$ ' : ''}${grouped.format(h.value)}`;
+    typeof h.value === 'string'
+      ? h.value
+      : h.percent
+        ? `${Math.round(h.value * 100)}%`
+        : h.decimal
+          ? h.value.toFixed(1)
+          : `${h.money ? '$ ' : ''}${grouped.format(h.value)}`;
   // Un dígito de Calibri en negrita mide cerca de 0,72 px por punto de letra; 18 px son la sangría y el margen.
   return Math.max(10, Math.min(16, Math.floor((boxPx - 18) / (text.length * 0.72))));
 }
@@ -293,7 +319,7 @@ function buildSheet(spec: SheetSpec, meta: WorkbookMeta, images: ReportImages | 
         data.push([
           { value: h.label, type: String, columnSpan: n - 1, fontSize: 9.5, fontWeight: 'bold', textColor: MUTED, backgroundColor: ZEBRA, leftBorderColor: tone.strong, leftBorderStyle: 'thick', indent: 1, height: 20, alignVertical: 'center' },
           ...Array<Cell>(n - 2).fill(null),
-          valueCell(h.value, { header: h.label, money: h.money, percent: h.percent }, { fontSize: 12, fontWeight: 'bold', textColor: h.tone === 'neutral' || !h.tone ? INK : tone.text, backgroundColor: ZEBRA, alignVertical: 'center', height: 20 }),
+          valueCell(h.value, { header: h.label, money: h.money, percent: h.percent, decimal: h.decimal }, { fontSize: 12, fontWeight: 'bold', textColor: h.tone === 'neutral' || !h.tone ? INK : tone.text, backgroundColor: ZEBRA, alignVertical: 'center', height: 20 }),
         ]);
       }
     }
@@ -348,6 +374,7 @@ function buildSheet(spec: SheetSpec, meta: WorkbookMeta, images: ReportImages | 
     }
     const isBold = bold.has(r);
     const fill = isBold ? SUBTOTAL : stripe++ % 2 === 1 ? ZEBRA : WHITE;
+    const height = wrappedHeight(row, spec.columns, widths);
     data.push(
       row.map((value, i) => {
         const column = spec.columns[i];
@@ -357,10 +384,11 @@ function buildSheet(spec: SheetSpec, meta: WorkbookMeta, images: ReportImages | 
           textColor: tone ? TONES[tone].text : INK,
           backgroundColor: tone ? TONES[tone].fill : fill,
           ...(isBold || tone ? { fontWeight: 'bold' as const } : {}),
-          alignVertical: 'center',
+          alignVertical: height > 18 ? 'top' : 'center',
+          ...(column?.wrap ? { wrap: true } : {}),
           bottomBorderColor: isBold ? '#C4C0B6' : LINE,
           bottomBorderStyle: 'thin',
-          height: 18,
+          height,
         });
       }),
     );

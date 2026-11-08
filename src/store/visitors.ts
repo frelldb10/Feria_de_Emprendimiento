@@ -1,7 +1,7 @@
 import { normalizeText } from '../lib/format';
-import type { Visitor, VisitorOrigin } from './types';
+import type { HeardFrom, Lodging, Transport, TripPurpose, Visitor, VisitorOrigin } from './types';
 
-// Deben coincidir con la restricción "origin" de visitors en schema.sql.
+// Las listas deben coincidir con las restricciones de visitors en schema.sql.
 export const VISITOR_ORIGINS: { id: VisitorOrigin; label: string; detailLabel: string; detailRequired: boolean }[] = [
   { id: 'astrea_urbano', label: 'Astrea, casco urbano', detailLabel: 'Barrio', detailRequired: false },
   { id: 'astrea_rural', label: 'Zona rural de Astrea', detailLabel: 'Corregimiento o vereda', detailRequired: true },
@@ -9,10 +9,76 @@ export const VISITOR_ORIGINS: { id: VisitorOrigin; label: string; detailLabel: s
   { id: 'otro_departamento', label: 'Otro departamento', detailLabel: 'Municipio y departamento', detailRequired: true },
 ];
 
+export interface Option<T> {
+  id: T;
+  label: string;
+}
+
+export const GROUP_SIZES: Option<number>[] = [
+  { id: 1, label: 'Solo yo' },
+  { id: 2, label: '2 personas' },
+  { id: 3, label: '3 personas' },
+  { id: 4, label: '4 personas' },
+  { id: 5, label: '5 o más' },
+];
+
+export const HEARD_FROM: Option<HeardFrom>[] = [
+  { id: 'redes', label: 'Redes sociales' },
+  { id: 'radio', label: 'Radio o perifoneo' },
+  { id: 'conocidos', label: 'Familiares o amigos' },
+  { id: 'de_paso', label: 'Pasaba por aquí' },
+  { id: 'otro', label: 'Otro medio' },
+];
+
+export const TRIP_PURPOSES: Option<TripPurpose>[] = [
+  { id: 'feria', label: 'Vine a la feria' },
+  { id: 'familia', label: 'Visitar familiares o amigos' },
+  { id: 'trabajo', label: 'Trabajo o negocios' },
+  { id: 'transito', label: 'Voy de paso' },
+  { id: 'otro', label: 'Otro motivo' },
+];
+
+export const NIGHTS: Option<number>[] = [
+  { id: 0, label: 'No, regreso hoy' },
+  { id: 1, label: '1 noche' },
+  { id: 2, label: '2 noches' },
+  { id: 3, label: '3 noches o más' },
+];
+
+export const LODGING: Option<Lodging>[] = [
+  { id: 'hotel', label: 'Hotel o residencias' },
+  { id: 'familia', label: 'Casa de familiares o amigos' },
+  { id: 'otro', label: 'Otro lugar' },
+];
+
+export const TRANSPORT: Option<Transport>[] = [
+  { id: 'moto', label: 'Moto' },
+  { id: 'carro', label: 'Carro particular' },
+  { id: 'bus', label: 'Bus o transporte intermunicipal' },
+  { id: 'otro', label: 'Otro medio' },
+];
+
 const ORIGIN_LABEL = Object.fromEntries(VISITOR_ORIGINS.map((o) => [o.id, o.label])) as Record<VisitorOrigin, string>;
 
 export function originLabel(origin: VisitorOrigin): string {
   return ORIGIN_LABEL[origin] ?? origin;
+}
+
+export function optionLabel<T>(options: Option<T>[], id: T | null): string {
+  return id === null ? '' : (options.find((o) => o.id === id)?.label ?? String(id));
+}
+
+/**
+ * Quien vive en Astrea (casco urbano o zona rural) está en su entorno habitual: es público local.
+ * Quien viene de otro municipio es un visitante en el sentido de las estadísticas de turismo.
+ */
+export function isFromOutside(origin: VisitorOrigin | ''): boolean {
+  return origin === 'cesar' || origin === 'otro_departamento';
+}
+
+/** Celular de 10 dígitos que empieza por 3, o fijo de 10 dígitos que empieza por 60. */
+export function isColombianPhone(value: string): boolean {
+  return /^(3\d{9}|60\d{8})$/.test(value);
 }
 
 /** "Zona rural de Astrea · Vereda El Hebrón" */
@@ -23,6 +89,13 @@ export function visitorPlace(visitor: Pick<Visitor, 'origin' | 'originDetail'>):
 /** Fecha de hoy en Colombia, AAAA-MM-DD, para compararla con visitDate. */
 export function todayInColombia(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
+}
+
+const hourFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/Bogota' });
+
+/** Hora (0 a 23) del registro en Colombia. */
+export function hourInColombia(iso: string): number {
+  return Number(hourFormat.format(new Date(iso))) % 24;
 }
 
 export interface VisitorStats {
@@ -52,8 +125,69 @@ export function visitorStats(list: Visitor[]): VisitorStats {
     total: list.length,
     today: list.filter((v) => v.visitDate === today).length,
     people: new Set(list.map((v) => v.document)).size,
-    outsideAstrea: list.filter((v) => v.origin === 'cesar' || v.origin === 'otro_departamento').length,
+    outsideAstrea: list.filter((v) => isFromOutside(v.origin)).length,
     byOrigin: VISITOR_ORIGINS.map((o) => ({ origin: o.id, label: o.label, count: list.filter((v) => v.origin === o.id).length })),
     topPlaces: [...places.values()].sort((a, b) => b.count - a.count).slice(0, 5),
+  };
+}
+
+export interface Tally {
+  label: string;
+  count: number;
+}
+
+export interface TourismStats {
+  total: number;
+  /** Residentes de Astrea (casco urbano y zona rural). */
+  locals: number;
+  /** Vienen de otro municipio. */
+  visitors: number;
+  /** Visitantes que pasan al menos una noche en Astrea. */
+  tourists: number;
+  /** Visitantes que regresan el mismo día. */
+  excursionists: number;
+  /** Visitantes registrados antes de la encuesta, sin dato de noches. */
+  visitorsWithoutNights: number;
+  /** Noches que suman los turistas ("3 o más" cuenta como 3). */
+  nights: number;
+  /** Noches promedio por turista. */
+  averageStay: number;
+  /** Personas promedio por grupo de viaje, entre quienes respondieron. */
+  averageGroup: number;
+  answeredSurvey: number;
+  byPurpose: Tally[];
+  byLodging: Tally[];
+  byTransport: Tally[];
+  byGroup: Tally[];
+  byHeard: Tally[];
+}
+
+function tally<T>(options: Option<T>[], values: Array<T | null>): Tally[] {
+  return options.map((o) => ({ label: o.label, count: values.filter((v) => v === o.id).length }));
+}
+
+/** Cifras de turismo con la clasificación de las Recomendaciones Internacionales (RIET 2008). */
+export function tourismStats(list: Visitor[]): TourismStats {
+  const outside = list.filter((v) => isFromOutside(v.origin));
+  const tourists = outside.filter((v) => v.nights !== null && v.nights > 0);
+  const excursionists = outside.filter((v) => v.nights === 0);
+  const nights = tourists.reduce((sum, v) => sum + (v.nights ?? 0), 0);
+  const groups = list.filter((v) => v.groupSize !== null);
+  return {
+    total: list.length,
+    locals: list.length - outside.length,
+    visitors: outside.length,
+    tourists: tourists.length,
+    excursionists: excursionists.length,
+    visitorsWithoutNights: outside.length - tourists.length - excursionists.length,
+    nights,
+    averageStay: tourists.length > 0 ? nights / tourists.length : 0,
+    averageGroup: groups.length > 0 ? groups.reduce((sum, v) => sum + (v.groupSize ?? 0), 0) / groups.length : 0,
+    answeredSurvey: list.filter((v) => v.heardFrom !== null).length,
+    byPurpose: tally(TRIP_PURPOSES, outside.map((v) => v.tripPurpose)),
+    byLodging: tally(LODGING, tourists.map((v) => v.lodging)),
+    byTransport: tally(TRANSPORT, outside.map((v) => v.transport)),
+    byGroup: tally(GROUP_SIZES, list.map((v) => v.groupSize)),
+    byHeard: tally(HEARD_FROM, list.map((v) => v.heardFrom)),
   };
 }

@@ -1,4 +1,4 @@
-import { ChartColumn, ClipboardList, GraduationCap, Landmark, PackageCheck, UserRoundCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { ChartColumn, ClipboardList, GraduationCap, Landmark, Luggage, PackageCheck, UserRoundCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { fileStamp, formatDateOnly, formatForExport } from '../../lib/format';
 import { downloadWorkbook, type ColumnSpec, type SheetSpec } from '../../lib/xlsx';
 import { SECTIONS, sectionLabel } from '../../store/sections';
@@ -9,9 +9,10 @@ import { buildSalesSheets } from '../finance/balance';
 import { buildCurrentFairSheets } from '../history/edition';
 import { KIT_ITEMS } from '../logistics/kit';
 import { buildPettyCashSheets } from '../pettyCash/pettyCashReport';
+import { buildTourismSheets } from '../visitors/tourismReport';
 import { buildVisitorSheets } from '../visitors/visitorsReport';
 
-export type ReportId = 'general' | 'asistencia' | 'capacitacion' | 'kits' | 'bonos' | 'ventas' | 'caja-menor' | 'visitantes';
+export type ReportId = 'general' | 'asistencia' | 'capacitacion' | 'kits' | 'bonos' | 'ventas' | 'caja-menor' | 'visitantes' | 'turismo';
 export type ReportGroup = 'general' | 'operacion' | 'finanzas' | 'publico';
 
 export interface ReportDefinition {
@@ -325,6 +326,16 @@ export const REPORTS: ReportDefinition[] = [
     contents: ['Resumen', 'Visitantes', 'Lugares', 'Por día'],
     count: (state) => state.visitors.list.length,
     sheets: buildVisitorSheets,
+  },
+  {
+    id: 'turismo',
+    group: 'publico',
+    title: 'Informe turístico de la feria',
+    description: 'Cómo se comportó la feria según las estadísticas de turismo: turistas, excursionistas, noches, motivo del viaje, transporte y afluencia.',
+    icon: Luggage,
+    contents: ['Resumen turístico', 'Procedencia', 'Afluencia por hora', 'Metodología'],
+    count: (state) => state.visitors.list.length,
+    sheets: buildTourismSheets,
   },
 ];
 

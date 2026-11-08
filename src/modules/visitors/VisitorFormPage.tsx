@@ -10,36 +10,121 @@ import { cn } from '../../lib/cn';
 import { describeError } from '../../lib/supabase';
 import { isFullName, onlyDigits, onlyLetters } from '../../lib/text';
 import { isVisitorRegistrationOpen, registerVisitor } from '../../store/actions';
-import { VISITOR_ORIGINS } from '../../store/visitors';
-import type { VisitorOrigin } from '../../store/types';
+import {
+  GROUP_SIZES,
+  HEARD_FROM,
+  isColombianPhone,
+  isFromOutside,
+  LODGING,
+  NIGHTS,
+  TRANSPORT,
+  TRIP_PURPOSES,
+  VISITOR_ORIGINS,
+  type Option,
+} from '../../store/visitors';
+import type { HeardFrom, Lodging, Transport, TripPurpose, VisitorOrigin } from '../../store/types';
 
 type Phase = 'loading' | 'closed' | 'unavailable' | 'form' | 'done' | 'repeated';
 
 interface Form {
   fullName: string;
   document: string;
+  phone: string;
   origin: VisitorOrigin | '';
   originDetail: string;
+  tripPurpose: TripPurpose | null;
+  nights: number | null;
+  lodging: Lodging | null;
+  transport: Transport | null;
+  groupSize: number | null;
+  heardFrom: HeardFrom | null;
   consent: boolean;
 }
 
 type Errors = Partial<Record<keyof Form, string>>;
 
-const EMPTY: Form = { fullName: '', document: '', origin: '', originDetail: '', consent: false };
+const EMPTY: Form = {
+  fullName: '',
+  document: '',
+  phone: '',
+  origin: '',
+  originDetail: '',
+  tripPurpose: null,
+  nights: null,
+  lodging: null,
+  transport: null,
+  groupSize: null,
+  heardFrom: null,
+  consent: false,
+};
 
 function validate(form: Form): Errors {
   const errors: Errors = {};
   if (!isFullName(form.fullName)) errors.fullName = 'Escribe tu nombre y apellido, solo con letras.';
   if (form.document.length < 5 || form.document.length > 12) errors.document = 'La cédula debe tener entre 5 y 12 dígitos.';
+  if (!isColombianPhone(form.phone)) errors.phone = 'Escribe un celular de 10 dígitos que empiece por 3 (o un fijo que empiece por 60).';
   const origin = VISITOR_ORIGINS.find((o) => o.id === form.origin);
   if (!origin) errors.origin = 'Elige de dónde nos visitas.';
   else if (origin.detailRequired && form.originDetail.trim().length < 2) errors.originDetail = `Escribe ${origin.detailLabel.toLowerCase()}.`;
+  if (isFromOutside(form.origin)) {
+    if (form.tripPurpose === null) errors.tripPurpose = 'Elige el motivo de tu viaje.';
+    if (form.nights === null) errors.nights = 'Dinos si pasas la noche en Astrea.';
+    else if (form.nights > 0 && form.lodging === null) errors.lodging = 'Elige dónde te hospedas.';
+    if (form.transport === null) errors.transport = 'Elige en qué viajaste.';
+  }
+  if (form.groupSize === null) errors.groupSize = 'Elige con cuántas personas vienes.';
+  if (form.heardFrom === null) errors.heardFrom = 'Elige cómo te enteraste de la feria.';
   if (!form.consent) errors.consent = 'Para registrarte debes autorizar el tratamiento de tus datos.';
   return errors;
 }
 
 /** Si la base todavía no tiene el módulo, al visitante no se le muestra el mensaje técnico. */
 const isSetupProblem = (message: string) => message.includes('no está actualizada');
+
+interface ChoiceGroupProps<T> {
+  name: string;
+  legend: string;
+  options: Option<T>[];
+  value: T | null;
+  onChange: (value: T) => void;
+  error?: string;
+  /** Dos columnas para opciones cortas. */
+  compact?: boolean;
+}
+
+/** Preguntas de un toque: cada opción es una tarjeta grande, fácil de tocar en el celular. */
+function ChoiceGroup<T extends string | number>({ name, legend, options, value, onChange, error, compact = false }: ChoiceGroupProps<T>) {
+  return (
+    <fieldset data-error={error ? 'true' : undefined}>
+      <legend className="mb-1.5 text-sm font-semibold text-carbon-800">
+        {legend}
+        <span className="text-rojo-600"> *</span>
+      </legend>
+      <div className={cn('grid gap-2', compact && 'grid-cols-2')}>
+        {options.map((o) => (
+          <label
+            key={String(o.id)}
+            className={cn(
+              'flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors',
+              value === o.id ? 'border-verde-600 bg-verde-50' : error ? 'border-rojo-300 bg-white' : 'border-carbon-200 bg-white hover:border-carbon-300',
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={String(o.id)}
+              checked={value === o.id}
+              onChange={() => onChange(o.id)}
+              className="size-5 shrink-0 accent-verde-700"
+            />
+            <span className="font-medium text-carbon-900">{o.label}</span>
+          </label>
+        ))}
+      </div>
+      {error && <p className="mt-1.5 text-sm font-medium text-rojo-700">{error}</p>}
+    </fieldset>
+  );
+}
 
 /**
  * Página pública que abre el QR de visitantes. No pide cuenta: el visitante solo puede registrarse,
@@ -69,19 +154,36 @@ export function VisitorFormPage() {
     event.preventDefault();
     const found = validate(form);
     setErrors(found);
-    if (Object.keys(found).length > 0 || !form.origin || busy) return;
+    if (Object.keys(found).length > 0) {
+      // El formulario es largo en el celular: se lleva a la persona a la primera respuesta que falta.
+      requestAnimationFrame(() =>
+        document.querySelector('[aria-invalid="true"], [data-error="true"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      );
+      return;
+    }
+    if (!form.origin || busy) return;
+    const outside = isFromOutside(form.origin);
     setBusy(true);
     setFailure(null);
     try {
       const status = await registerVisitor({
         fullName: form.fullName.trim(),
         document: form.document,
+        phone: form.phone,
         origin: form.origin,
         originDetail: form.originDetail.trim(),
+        groupSize: form.groupSize,
+        heardFrom: form.heardFrom,
+        // Las preguntas del viaje solo aplican a quien viene de otro municipio.
+        tripPurpose: outside ? form.tripPurpose : null,
+        nights: outside ? form.nights : null,
+        lodging: outside && form.nights !== null && form.nights > 0 ? form.lodging : null,
+        transport: outside ? form.transport : null,
         consent: form.consent,
       });
       setRegisteredName(form.fullName.trim().split(/\s+/)[0]);
       setPhase(status === 'ok' ? 'done' : 'repeated');
+      window.scrollTo({ top: 0 });
     } catch (error) {
       const message = describeError(error);
       if (message === 'El registro de visitantes está cerrado.') setPhase('closed');
@@ -100,6 +202,7 @@ export function VisitorFormPage() {
   }
 
   const origin = VISITOR_ORIGINS.find((o) => o.id === form.origin);
+  const outside = isFromOutside(form.origin);
 
   return (
     <div className="min-h-dvh bg-carbon-50">
@@ -145,7 +248,7 @@ export function VisitorFormPage() {
           )}
 
           {phase === 'form' && (
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
               <div>
                 <h1 className="text-xl font-semibold tracking-tight">Registra tu visita</h1>
                 <p className="mt-1 text-sm text-carbon-500">Feria de Emprendimiento · Alcaldía Municipal de Astrea</p>
@@ -171,34 +274,27 @@ export function VisitorFormPage() {
                 required
                 error={errors.document}
               />
+              <TextField
+                label="Teléfono"
+                type="tel"
+                value={form.phone}
+                onChange={(e) => update('phone', onlyDigits(e.target.value).slice(0, 10))}
+                inputMode="tel"
+                autoComplete="tel-national"
+                size="lg"
+                required
+                hint="Celular de 10 dígitos"
+                error={errors.phone}
+              />
 
-              <fieldset>
-                <legend className="mb-1.5 text-sm font-semibold text-carbon-800">
-                  ¿De dónde nos visitas?<span className="text-rojo-600"> *</span>
-                </legend>
-                <div className="grid gap-2">
-                  {VISITOR_ORIGINS.map((o) => (
-                    <label
-                      key={o.id}
-                      className={cn(
-                        'flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors',
-                        form.origin === o.id ? 'border-verde-600 bg-verde-50' : 'border-carbon-200 bg-white hover:border-carbon-300',
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="origin"
-                        value={o.id}
-                        checked={form.origin === o.id}
-                        onChange={() => update('origin', o.id)}
-                        className="size-5 shrink-0 accent-verde-700"
-                      />
-                      <span className="font-medium text-carbon-900">{o.label}</span>
-                    </label>
-                  ))}
-                </div>
-                {errors.origin && <p className="mt-1.5 text-sm font-medium text-rojo-700">{errors.origin}</p>}
-              </fieldset>
+              <ChoiceGroup
+                name="origin"
+                legend="¿De dónde nos visitas?"
+                options={VISITOR_ORIGINS}
+                value={form.origin || null}
+                onChange={(value) => update('origin', value)}
+                error={errors.origin}
+              />
 
               {origin && (
                 <TextField
@@ -212,12 +308,70 @@ export function VisitorFormPage() {
                 />
               )}
 
-              <div>
+              {outside && (
+                <div className="space-y-5 rounded-lg border border-carbon-200 bg-carbon-50 p-4">
+                  <p className="text-sm font-semibold text-carbon-800">Sobre tu viaje a Astrea</p>
+                  <ChoiceGroup
+                    name="tripPurpose"
+                    legend="¿Cuál es el motivo principal de tu viaje?"
+                    options={TRIP_PURPOSES}
+                    value={form.tripPurpose}
+                    onChange={(value) => update('tripPurpose', value)}
+                    error={errors.tripPurpose}
+                  />
+                  <ChoiceGroup
+                    name="nights"
+                    legend="¿Pasas la noche en Astrea?"
+                    options={NIGHTS}
+                    value={form.nights}
+                    onChange={(value) => update('nights', value)}
+                    error={errors.nights}
+                  />
+                  {form.nights !== null && form.nights > 0 && (
+                    <ChoiceGroup
+                      name="lodging"
+                      legend="¿Dónde te hospedas?"
+                      options={LODGING}
+                      value={form.lodging}
+                      onChange={(value) => update('lodging', value)}
+                      error={errors.lodging}
+                    />
+                  )}
+                  <ChoiceGroup
+                    name="transport"
+                    legend="¿En qué viajaste?"
+                    options={TRANSPORT}
+                    value={form.transport}
+                    onChange={(value) => update('transport', value)}
+                    error={errors.transport}
+                  />
+                </div>
+              )}
+
+              <ChoiceGroup
+                name="groupSize"
+                legend="¿Cuántas personas vienen en tu grupo, contándote a ti?"
+                options={GROUP_SIZES}
+                value={form.groupSize}
+                onChange={(value) => update('groupSize', value)}
+                error={errors.groupSize}
+                compact
+              />
+              <ChoiceGroup
+                name="heardFrom"
+                legend="¿Cómo te enteraste de la feria?"
+                options={HEARD_FROM}
+                value={form.heardFrom}
+                onChange={(value) => update('heardFrom', value)}
+                error={errors.heardFrom}
+              />
+
+              <div data-error={errors.consent ? 'true' : undefined}>
                 <Checkbox
                   checked={form.consent}
                   onChange={(value) => update('consent', value)}
                   label="Autorizo el tratamiento de mis datos"
-                  description="La Alcaldía Municipal de Astrea usará tu nombre, cédula y procedencia solo para el registro y las estadísticas de la feria (Ley 1581 de 2012)."
+                  description="La Alcaldía Municipal de Astrea usará tu nombre, cédula, teléfono y respuestas solo para el registro y las estadísticas de la feria (Ley 1581 de 2012)."
                 />
                 {errors.consent && <p className="mt-1.5 text-sm font-medium text-rojo-700">{errors.consent}</p>}
               </div>

@@ -13,10 +13,11 @@ import { formatDateTime, normalizeText, plural } from '../../lib/format';
 import { describeError } from '../../lib/supabase';
 import { deleteVisitor, setVisitorRegistrationOpen } from '../../store/actions';
 import { useFairState } from '../../store/fairStore';
-import { visitorPlace, visitorStats } from '../../store/visitors';
+import { tourismStats, visitorPlace, visitorStats } from '../../store/visitors';
 import type { Visitor } from '../../store/types';
 import { useCanEdit } from '../auth/useCanEdit';
 import { ReportDownloadButton } from '../reports/ReportDownloadButton';
+import { TourismCard } from './TourismCard';
 import { VisitorPosterModal } from './VisitorPosterModal';
 
 const SHOWN = 200;
@@ -27,13 +28,14 @@ export function VisitorsPage() {
   const [poster, setPoster] = useState(false);
   const [query, setQuery] = useState('');
   const stats = useMemo(() => visitorStats(visitors.list), [visitors.list]);
+  const tourism = useMemo(() => tourismStats(visitors.list), [visitors.list]);
   const url = `${window.location.origin}/visita`;
 
   const filtered = useMemo(() => {
     const q = normalizeText(query);
     if (q.length < 2) return visitors.list;
     return visitors.list.filter(
-      (v) => normalizeText(v.fullName).includes(q) || v.document.includes(q) || normalizeText(v.originDetail).includes(q),
+      (v) => normalizeText(v.fullName).includes(q) || v.document.includes(q) || v.phone.includes(q) || normalizeText(v.originDetail).includes(q),
     );
   }, [visitors.list, query]);
 
@@ -47,6 +49,9 @@ export function VisitorsPage() {
             <Button variant="secondary" icon={Printer} onClick={() => setPoster(true)} disabled={!visitors.installed}>
               Cartel con el QR
             </Button>
+            <ReportDownloadButton report="turismo" disabled={visitors.list.length === 0}>
+              Informe turístico
+            </ReportDownloadButton>
             <ReportDownloadButton report="visitantes" disabled={visitors.list.length === 0} />
           </>
         }
@@ -115,6 +120,7 @@ export function VisitorsPage() {
                   )}
                 </Card>
               </div>
+              <TourismCard stats={tourism} />
             </div>
             <RegistrationCard url={url} open={visitors.open} canEdit={canEdit} />
           </div>
@@ -241,7 +247,7 @@ function VisitorList({ visitors, total, query, onQuery, canDelete }: VisitorList
             type="search"
             value={query}
             onChange={(event) => onQuery(event.target.value)}
-            placeholder="Buscar por nombre, cédula o lugar"
+            placeholder="Buscar por nombre, cédula, teléfono o lugar"
             aria-label="Buscar visitantes"
             className="block h-10 w-full rounded-lg border border-carbon-300 pr-3 pl-9 text-sm placeholder:text-carbon-400 focus:border-verde-700 focus:ring-2 focus:ring-verde-700/20 focus:outline-none"
           />
@@ -259,6 +265,7 @@ function VisitorList({ visitors, total, query, onQuery, canDelete }: VisitorList
                 <th className="px-4 py-2.5 font-semibold sm:pl-5">Fecha y hora</th>
                 <th className="px-3 py-2.5 font-semibold">Nombre</th>
                 <th className="px-3 py-2.5 font-semibold">Cédula</th>
+                <th className="px-3 py-2.5 font-semibold">Teléfono</th>
                 <th className={canDelete ? 'px-3 py-2.5 font-semibold' : 'px-3 py-2.5 font-semibold sm:pr-5'}>Procedencia</th>
                 {canDelete && (
                   <th className="px-3 py-2.5 sm:pr-5">
@@ -273,6 +280,7 @@ function VisitorList({ visitors, total, query, onQuery, canDelete }: VisitorList
                   <td className="px-4 py-2.5 whitespace-nowrap text-carbon-600 tabular-nums sm:pl-5">{formatDateTime(v.at)}</td>
                   <td className="px-3 py-2.5 font-medium text-carbon-900">{v.fullName}</td>
                   <td className="px-3 py-2.5 tabular-nums">{v.document}</td>
+                  <td className="px-3 py-2.5 tabular-nums">{v.phone || <span className="text-carbon-400">—</span>}</td>
                   <td className="px-3 py-2.5">{visitorPlace(v)}</td>
                   {canDelete && (
                     <td className="px-3 py-1.5 text-right sm:pr-5">
